@@ -110,12 +110,12 @@ embedding:
 #   model: nomic-embed-text-v1.5
 #   baseUrl: $LMSTUDIO_BASE_URL
 
-# Voyage (for Anthropic/Claude users):
-# embedding:
-#   type: voyage
-#   model: voyage-3-large     #(1024, 256, 512, 2048)
-#   apiKey: $VOYAGE_API_KEY
-#   dimensions: 1024
+Voyage (for Anthropic/Claude users):
+embedding:
+  type: voyage
+  model: voyage-3-large     #(1024, 256, 512, 2048)
+  apiKey: $VOYAGE_API_KEY
+  dimensions: 1024
 
 # Qwen:
 # embedding:
