@@ -188,28 +188,28 @@ export class LLMServices implements ILLMService {
 		return ModelFamily.ANTHROPIC;
 	}
 
-    private initializeAwsFormatter(modelFamily: ModelFamily): any {
-        switch (modelFamily) {
-            case ModelFamily.ANTHROPIC: {
-                return new BedrockAnthropicMessageFormatter();
-            }
-            case ModelFamily.META_LLAMA: {
-                return new BedrockLlamaMessageFormatter();
-            }
-            case ModelFamily.AMAZON_TITAN: {
-                return new BedrockTitanMessageFormatter();
-            }
-            case ModelFamily.DEEPSEEK: {
-                return new BedrockDeepSeekMessageFormatter();
-            }
-            case ModelFamily.AI21_LABS: {
-                return new BedrockAI21MessageFormatter();
-            }
-            default: {
-                return new BedrockAnthropicMessageFormatter();
-            }
-        }
-    }
+	private initializeAwsFormatter(modelFamily: ModelFamily): any {
+		switch (modelFamily) {
+			case ModelFamily.ANTHROPIC: {
+				return new BedrockAnthropicMessageFormatter();
+			}
+			case ModelFamily.META_LLAMA: {
+				return new BedrockLlamaMessageFormatter();
+			}
+			case ModelFamily.AMAZON_TITAN: {
+				return new BedrockTitanMessageFormatter();
+			}
+			case ModelFamily.DEEPSEEK: {
+				return new BedrockDeepSeekMessageFormatter();
+			}
+			case ModelFamily.AI21_LABS: {
+				return new BedrockAI21MessageFormatter();
+			}
+			default: {
+				return new BedrockAnthropicMessageFormatter();
+			}
+		}
+	}
 
 	private initializeClient(config: ExtendedLLMConfig): any {
 		switch (config.provider) {
@@ -234,50 +234,50 @@ export class LLMServices implements ILLMService {
 				});
 
 			case 'aws': {
-                const clientConfig: BedrockRuntimeClientConfig = {
-                    region:
-                        config.awsConfig?.region ||
-                        config.region ||
-                        process.env.AWS_DEFAULT_REGION ||
-                        'us-east-1',
-                };
+				const clientConfig: BedrockRuntimeClientConfig = {
+					region:
+						config.awsConfig?.region ||
+						config.region ||
+						process.env.AWS_DEFAULT_REGION ||
+						'us-east-1',
+				};
 
-                const accessKeyId = config.awsConfig?.accessKeyId || process.env.AWS_ACCESS_KEY_ID;
-                const secretAccessKey =
-                    config.awsConfig?.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY;
-                const sessionToken = config.awsConfig?.sessionToken || process.env.AWS_SESSION_TOKEN;
+				const accessKeyId = config.awsConfig?.accessKeyId || process.env.AWS_ACCESS_KEY_ID;
+				const secretAccessKey =
+					config.awsConfig?.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY;
+				const sessionToken = config.awsConfig?.sessionToken || process.env.AWS_SESSION_TOKEN;
 
-                if (accessKeyId && secretAccessKey) {
-                    const credentials: any = {
-                        accessKeyId,
-                        secretAccessKey,
-                    };
-                    if (sessionToken) {
-                        credentials.sessionToken = sessionToken;
-                    }
-                    clientConfig.credentials = credentials;
-                }
+				if (accessKeyId && secretAccessKey) {
+					const credentials: any = {
+						accessKeyId,
+						secretAccessKey,
+					};
+					if (sessionToken) {
+						credentials.sessionToken = sessionToken;
+					}
+					clientConfig.credentials = credentials;
+				}
 
-                logger.info(
-                    `AWS Bedrock service initialized with model: ${config.model} (family: ${this.modelFamily}) in region: ${clientConfig.region}`
-                );
+				logger.info(
+					`AWS Bedrock service initialized with model: ${config.model} (family: ${this.modelFamily}) in region: ${clientConfig.region}`
+				);
 
-                return new BedrockRuntimeClient(clientConfig);
-            }
+				return new BedrockRuntimeClient(clientConfig);
+			}
 
-            case 'azure': {
-                const endpoint = config.endpoint || process.env.AZURE_OPENAI_ENDPOINT;
-                const apiKey = config.apiKey || process.env.AZURE_OPENAI_API_KEY;
+			case 'azure': {
+				const endpoint = config.endpoint || process.env.AZURE_OPENAI_ENDPOINT;
+				const apiKey = config.apiKey || process.env.AZURE_OPENAI_API_KEY;
 
-                if (!endpoint) {
-                    throw new Error('Azure OpenAI endpoint is required');
-                }
-                if (!apiKey) {
-                    throw new Error('Azure OpenAI API key is required');
-                }
+				if (!endpoint) {
+					throw new Error('Azure OpenAI endpoint is required');
+				}
+				if (!apiKey) {
+					throw new Error('Azure OpenAI API key is required');
+				}
 
-                return new OpenAIClient(endpoint, new AzureKeyCredential(apiKey));
-            }
+				return new OpenAIClient(endpoint, new AzureKeyCredential(apiKey));
+			}
 
 			case 'openrouter':
 				return new OpenAI({
@@ -541,10 +541,10 @@ export class LLMServices implements ILLMService {
 			} else {
 				messages = await this.contextManager.getAllFormattedMessages();
 			}
-            const lastMessage = messages[messages.length - 1];
-            if (!lastMessage || lastMessage.role !== 'user' || lastMessage.content !== userInput) {
-                messages.push({ role: 'user', content: userInput });
-            }
+			const lastMessage = messages[messages.length - 1];
+			if (!lastMessage || lastMessage.role !== 'user' || lastMessage.content !== userInput) {
+				messages.push({ role: 'user', content: userInput });
+			}
 			const systemPrompt = await this.contextManager.getSystemPrompt();
 			let request: any;
 
@@ -599,139 +599,139 @@ export class LLMServices implements ILLMService {
 	}
 
 	private async generateAzure(
-        userInput: string,
-        _imageData?: ImageData,
-        _stream?: boolean
-    ): Promise<string> {
-        const client = this.client as OpenAIClient;
-        const formattedTools = await this.getFormattedTools('azure');
+		userInput: string,
+		_imageData?: ImageData,
+		_stream?: boolean
+	): Promise<string> {
+		const client = this.client as OpenAIClient;
+		const formattedTools = await this.getFormattedTools('azure');
 
-        let iterationCount = 0;
+		let iterationCount = 0;
 
-        while (iterationCount < this.maxIterations) {
-            iterationCount++;
+		while (iterationCount < this.maxIterations) {
+			iterationCount++;
 
-            // Get conversation history and ensure current userInput is included
-            const conversationHistory = await this.contextManager.getAllFormattedMessages();
-            const systemMessage = await this.contextManager.getSystemPrompt();
+			// Get conversation history and ensure current userInput is included
+			const conversationHistory = await this.contextManager.getAllFormattedMessages();
+			const systemMessage = await this.contextManager.getSystemPrompt();
 
-            // Ensure the current userInput is the last message
-            const lastMessage = conversationHistory[conversationHistory.length - 1];
-            if (!lastMessage || lastMessage.role !== 'user' || lastMessage.content !== userInput) {
-                conversationHistory.push({ role: 'user', content: userInput });
-            }
+			// Ensure the current userInput is the last message
+			const lastMessage = conversationHistory[conversationHistory.length - 1];
+			if (!lastMessage || lastMessage.role !== 'user' || lastMessage.content !== userInput) {
+				conversationHistory.push({ role: 'user', content: userInput });
+			}
 
-            const requestOptions: any = {
-                temperature: 0.7,
-                maxTokens: 4096,
-                topP: 1,
-            };
+			const requestOptions: any = {
+				temperature: 0.7,
+				maxTokens: 4096,
+				topP: 1,
+			};
 
-            if (formattedTools.length > 0) {
-                requestOptions.tools = formattedTools;
-                requestOptions.toolChoice = 'auto';
-            }
+			if (formattedTools.length > 0) {
+				requestOptions.tools = formattedTools;
+				requestOptions.toolChoice = 'auto';
+			}
 
-            const formattedMessages = [
-                ...(systemMessage ? [{ role: 'system' as const, content: systemMessage }] : []),
-                ...conversationHistory,
-            ];
+			const formattedMessages = [
+				...(systemMessage ? [{ role: 'system' as const, content: systemMessage }] : []),
+				...conversationHistory,
+			];
 
-            const response = await client.getChatCompletions(
-                this.config.deployment || this.model,
-                formattedMessages,
-                requestOptions
-            );
+			const response = await client.getChatCompletions(
+				this.config.deployment || this.model,
+				formattedMessages,
+				requestOptions
+			);
 
-            const choice = response.choices[0];
-            if (!choice) {
-                throw new Error('No choices returned from Azure OpenAI');
-            }
+			const choice = response.choices[0];
+			if (!choice) {
+				throw new Error('No choices returned from Azure OpenAI');
+			}
 
-            const message = choice.message as any;
+			const message = choice.message as any;
 
-            // Normalize tool calls format for Azure
-            const normalizedMessage = {
-                ...message,
-                tool_calls: message.toolCalls || message.tool_calls || undefined,
-            };
+			// Normalize tool calls format for Azure
+			const normalizedMessage = {
+				...message,
+				tool_calls: message.toolCalls || message.tool_calls || undefined,
+			};
 
-            if (!normalizedMessage.tool_calls || normalizedMessage.tool_calls.length === 0) {
-                const responseText = message.content || '';
-                await this.contextManager.addAssistantMessage(responseText);
-                return responseText;
-            }
+			if (!normalizedMessage.tool_calls || normalizedMessage.tool_calls.length === 0) {
+				const responseText = message.content || '';
+				await this.contextManager.addAssistantMessage(responseText);
+				return responseText;
+			}
 
-            await this.handleToolCalls(normalizedMessage);
-        }
+			await this.handleToolCalls(normalizedMessage);
+		}
 
-        throw new Error(`Maximum iterations (${this.maxIterations}) reached without final response`);
-    }
+		throw new Error(`Maximum iterations (${this.maxIterations}) reached without final response`);
+	}
 
 	private async generateGroq(
-        userInput: string,
-        _imageData?: ImageData,
-        _stream?: boolean
-    ): Promise<string> {
-        const client = this.client as Groq;
-        const formattedTools = await this.getFormattedTools('groq');
+		userInput: string,
+		_imageData?: ImageData,
+		_stream?: boolean
+	): Promise<string> {
+		const client = this.client as Groq;
+		const formattedTools = await this.getFormattedTools('groq');
 
-        let iterationCount = 0;
-        let toolsUsedInThisConversation = false;
+		let iterationCount = 0;
+		let toolsUsedInThisConversation = false;
 
-        while (iterationCount < this.maxIterations) {
-            iterationCount++;
+		while (iterationCount < this.maxIterations) {
+			iterationCount++;
 
-            // Get conversation history and ensure current userInput is included
-            const conversationHistory = await this.contextManager.getAllFormattedMessages();
-            
-            // Ensure the current userInput is the last message
-            const lastMessage = conversationHistory[conversationHistory.length - 1];
-            if (!lastMessage || lastMessage.role !== 'user' || lastMessage.content !== userInput) {
-                conversationHistory.push({ role: 'user', content: userInput });
-            }
+			// Get conversation history and ensure current userInput is included
+			const conversationHistory = await this.contextManager.getAllFormattedMessages();
 
-            // Check if tools have been used in conversation history
-            const hasToolCallsInHistory = conversationHistory.some(
-                msg => msg.tool_calls && msg.tool_calls.length > 0
-            );
+			// Ensure the current userInput is the last message
+			const lastMessage = conversationHistory[conversationHistory.length - 1];
+			if (!lastMessage || lastMessage.role !== 'user' || lastMessage.content !== userInput) {
+				conversationHistory.push({ role: 'user', content: userInput });
+			}
 
-            if (hasToolCallsInHistory) {
-                toolsUsedInThisConversation = true;
-            }
+			// Check if tools have been used in conversation history
+			const hasToolCallsInHistory = conversationHistory.some(
+				msg => msg.tool_calls && msg.tool_calls.length > 0
+			);
 
-            const requestParams: any = {
-                model: this.model,
-                messages: conversationHistory,
-                temperature: 0.7,
-                max_tokens: 4096,
-            };
+			if (hasToolCallsInHistory) {
+				toolsUsedInThisConversation = true;
+			}
 
-            // Only offer tools on first attempt and if tools haven't been used yet
-            if (iterationCount === 1 && formattedTools.length > 0 && !toolsUsedInThisConversation) {
-                requestParams.tools = formattedTools;
-                requestParams.tool_choice = 'auto';
-            }
+			const requestParams: any = {
+				model: this.model,
+				messages: conversationHistory,
+				temperature: 0.7,
+				max_tokens: 4096,
+			};
 
-            const response = await client.chat.completions.create(requestParams);
+			// Only offer tools on first attempt and if tools haven't been used yet
+			if (iterationCount === 1 && formattedTools.length > 0 && !toolsUsedInThisConversation) {
+				requestParams.tools = formattedTools;
+				requestParams.tool_choice = 'auto';
+			}
 
-            if (!response.choices || !response.choices[0] || !response.choices[0].message) {
-                throw new Error('No message in response');
-            }
-            const message = response.choices[0].message;
+			const response = await client.chat.completions.create(requestParams);
 
-            if (!message.tool_calls || message.tool_calls.length === 0) {
-                const responseText = message.content || '';
-                await this.contextManager.addAssistantMessage(responseText);
-                return responseText;
-            }
+			if (!response.choices || !response.choices[0] || !response.choices[0].message) {
+				throw new Error('No message in response');
+			}
+			const message = response.choices[0].message;
 
-            await this.handleToolCalls(message);
-            toolsUsedInThisConversation = true;
-        }
+			if (!message.tool_calls || message.tool_calls.length === 0) {
+				const responseText = message.content || '';
+				await this.contextManager.addAssistantMessage(responseText);
+				return responseText;
+			}
 
-        throw new Error(`Maximum iterations (${this.maxIterations}) reached without final response`);
-    }
+			await this.handleToolCalls(message);
+			toolsUsedInThisConversation = true;
+		}
+
+		throw new Error(`Maximum iterations (${this.maxIterations}) reached without final response`);
+	}
 
 	// ===================== RETRY LOGIC METHODS =====================
 
@@ -1148,81 +1148,81 @@ export class LLMServices implements ILLMService {
 	// ===================== DIRECT GENERATION METHODS =====================
 
 	async directGenerate(userInput: string, systemPrompt?: string): Promise<string> {
-        try {
-            switch (this.config.provider) {
-                case 'aws': {
-                    return await this.directGenerateBedrock(userInput, systemPrompt);
-                }
+		try {
+			switch (this.config.provider) {
+				case 'aws': {
+					return await this.directGenerateBedrock(userInput, systemPrompt);
+				}
 
-                case 'azure': {
-                    return await this.directGenerateAzure(userInput, systemPrompt);
-                }
+				case 'azure': {
+					return await this.directGenerateAzure(userInput, systemPrompt);
+				}
 
-                case 'google': {
-                    const client = this.client as GoogleGenerativeAI;
-                    const model = client.getGenerativeModel({ model: this.model });
-                    const prompt = systemPrompt ? `${systemPrompt}\n\n${userInput}` : userInput;
-                    const result = await model.generateContent(prompt);
-                    return result.response.text();
-                }
+				case 'google': {
+					const client = this.client as GoogleGenerativeAI;
+					const model = client.getGenerativeModel({ model: this.model });
+					const prompt = systemPrompt ? `${systemPrompt}\n\n${userInput}` : userInput;
+					const result = await model.generateContent(prompt);
+					return result.response.text();
+				}
 
-                case 'anthropic': {
-                    const body: any = {
-                        model: this.model,
-                        messages: [{ role: 'user', content: userInput }],
-                        max_tokens: 4096,
-                    };
-                    if (systemPrompt !== undefined) {
-                        body.system = systemPrompt;
-                    }
-                    const anthropicClient = this.client as Anthropic;
-                    const response = await anthropicClient.messages.create(body);
-                    return response.content.map(block => (block.type === 'text' ? block.text : '')).join('');
-                }
+				case 'anthropic': {
+					const body: any = {
+						model: this.model,
+						messages: [{ role: 'user', content: userInput }],
+						max_tokens: 4096,
+					};
+					if (systemPrompt !== undefined) {
+						body.system = systemPrompt;
+					}
+					const anthropicClient = this.client as Anthropic;
+					const response = await anthropicClient.messages.create(body);
+					return response.content.map(block => (block.type === 'text' ? block.text : '')).join('');
+				}
 
-                case 'groq': {
-                    const groqClient = this.client as Groq;
-                    const groqResponse = await groqClient.chat.completions.create({
-                        model: this.model,
-                        messages: [
-                            ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
-                            { role: 'user', content: userInput },
-                        ],
-                        temperature: 0.7,
-                        max_tokens: 4096,
-                    });
-                    return groqResponse.choices[0]?.message?.content || '';
-                }
+				case 'groq': {
+					const groqClient = this.client as Groq;
+					const groqResponse = await groqClient.chat.completions.create({
+						model: this.model,
+						messages: [
+							...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
+							{ role: 'user', content: userInput },
+						],
+						temperature: 0.7,
+						max_tokens: 4096,
+					});
+					return groqResponse.choices[0]?.message?.content || '';
+				}
 
-                default: {
-                    // OpenAI-compatible providers
-                    const openaiClient = this.client as OpenAI;
+				default: {
+					// OpenAI-compatible providers
+					const openaiClient = this.client as OpenAI;
 
-                    const requestBody: any = {
-                        model: this.model,
-                        messages: [
-                            ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
-                            { role: 'user', content: userInput },
-                        ],
-                    };
+					const requestBody: any = {
+						model: this.model,
+						messages: [
+							...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
+							{ role: 'user', content: userInput },
+						],
+					};
 
-                    // Add Qwen-specific options
-                    if (this.config.provider === 'qwen') {
-                        requestBody.enable_thinking = this.config.enableThinking ?? false;
-                        if (this.config.thinkingBudget !== undefined) {
-                            requestBody.thinking_budget = this.config.thinkingBudget;
-                        }
-                    }
+					// Add Qwen-specific options
+					if (this.config.provider === 'qwen') {
+						requestBody.enable_thinking = this.config.enableThinking ?? false;
+						if (this.config.thinkingBudget !== undefined) {
+							requestBody.thinking_budget = this.config.thinkingBudget;
+						}
+					}
 
-                    const completion = await openaiClient.chat.completions.create(requestBody);
-                    return completion.choices[0]?.message?.content || '';
-                }
-            }
-        } catch (error) {
-            logger.error(`Direct generation error for ${this.config.provider}:`, error);
-            throw error;
-        }
-    }
+					const completion = await openaiClient.chat.completions.create(requestBody);
+					return completion.choices[0]?.message?.content || '';
+				}
+			}
+		} catch (error) {
+			logger.error(`Direct generation error for ${this.config.provider}:`, error);
+			throw error;
+		}
+	}
 	private async directGenerateBedrock(userInput: string, systemPrompt?: string): Promise<string> {
 		const client = this.client as BedrockRuntimeClient;
 
