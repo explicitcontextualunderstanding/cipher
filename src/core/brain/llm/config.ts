@@ -31,14 +31,8 @@ const AzureConfigSchema = z.object({
 		.string()
 		.optional()
 		.describe('Azure deployment name (defaults to model name if not provided)'),
-	apiVersion: z
-		.string()
-		.optional()
-		.describe('Azure OpenAI API version (defaults to 2023-05-15)'),
-	resourceName: z
-		.string()
-		.optional()
-		.describe('Azure resource name (optional, for reference)'),
+	apiVersion: z.string().optional().describe('Azure OpenAI API version (defaults to 2023-05-15)'),
+	resourceName: z.string().optional().describe('Azure resource name (optional, for reference)'),
 });
 
 export const LLMConfigSchema = z

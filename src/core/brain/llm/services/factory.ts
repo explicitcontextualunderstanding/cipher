@@ -17,71 +17,71 @@ import { LMStudioService } from './lmstudio.js';
 import { DeepseekService } from './deepseek.js';
 
 function extractApiKey(config: LLMConfig): string {
-    const provider = config.provider.toLowerCase();
+	const provider = config.provider.toLowerCase();
 
-    // These providers don't require traditional API keys
-    if (
-        provider === 'ollama' ||
-        provider === 'lmstudio' ||
-        provider === 'aws' ||
-        provider === 'azure'
-    ) {
-        return 'not-required';
-    }
+	// These providers don't require traditional API keys
+	if (
+		provider === 'ollama' ||
+		provider === 'lmstudio' ||
+		provider === 'aws' ||
+		provider === 'azure'
+	) {
+		return 'not-required';
+	}
 
-    // Get API key from config (already expanded)
-    let apiKey = config.apiKey || '';
+	// Get API key from config (already expanded)
+	let apiKey = config.apiKey || '';
 
-    if (!apiKey) {
-        const errorMsg = `Error: API key for ${provider} not found`;
-        logger.error(errorMsg);
-        logger.error(`Please set your ${provider} API key in the config file or .env file`);
-        throw new Error(errorMsg);
-    }
-    logger.debug('Verified API key');
-    return apiKey;
+	if (!apiKey) {
+		const errorMsg = `Error: API key for ${provider} not found`;
+		logger.error(errorMsg);
+		logger.error(`Please set your ${provider} API key in the config file or .env file`);
+		throw new Error(errorMsg);
+	}
+	logger.debug('Verified API key');
+	return apiKey;
 }
 
 function getOpenAICompatibleBaseURL(llmConfig: LLMConfig): string {
-    if (llmConfig.baseURL) {
-        let baseUrl = llmConfig.baseURL.replace(/\/$/, '');
+	if (llmConfig.baseURL) {
+		let baseUrl = llmConfig.baseURL.replace(/\/$/, '');
 
-        // For Ollama, ensure /v1 suffix for OpenAI-compatible endpoint
-        const provider = llmConfig.provider.toLowerCase();
-        if (provider === 'ollama' && !baseUrl.endsWith('/v1') && !baseUrl.endsWith('/api')) {
-            baseUrl = baseUrl + '/v1';
-        }
+		// For Ollama, ensure /v1 suffix for OpenAI-compatible endpoint
+		const provider = llmConfig.provider.toLowerCase();
+		if (provider === 'ollama' && !baseUrl.endsWith('/v1') && !baseUrl.endsWith('/api')) {
+			baseUrl = baseUrl + '/v1';
+		}
 
-        return baseUrl;
-    }
+		return baseUrl;
+	}
 
-    // Provider-specific defaults and environment fallbacks
-    const provider = llmConfig.provider.toLowerCase();
+	// Provider-specific defaults and environment fallbacks
+	const provider = llmConfig.provider.toLowerCase();
 
-    if (provider === 'openrouter') {
-        return 'https://openrouter.ai/api/v1';
-    }
+	if (provider === 'openrouter') {
+		return 'https://openrouter.ai/api/v1';
+	}
 
-    if (provider === 'ollama') {
-        // Use environment variable if set, otherwise default to localhost:11434/v1
-        let baseUrl = env.OLLAMA_BASE_URL || 'http://localhost:11434/v1';
+	if (provider === 'ollama') {
+		// Use environment variable if set, otherwise default to localhost:11434/v1
+		let baseUrl = env.OLLAMA_BASE_URL || 'http://localhost:11434/v1';
 
-        // Ensure /v1 suffix for OpenAI-compatible endpoint
-        if (!baseUrl.endsWith('/v1') && !baseUrl.endsWith('/api')) {
-            baseUrl = baseUrl.replace(/\/$/, '') + '/v1';
-        }
+		// Ensure /v1 suffix for OpenAI-compatible endpoint
+		if (!baseUrl.endsWith('/v1') && !baseUrl.endsWith('/api')) {
+			baseUrl = baseUrl.replace(/\/$/, '') + '/v1';
+		}
 
-        return baseUrl;
-    }
+		return baseUrl;
+	}
 
-    if (provider === 'lmstudio') {
-        // Use environment variable if set, otherwise default to localhost:1234/v1
-        return env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1';
-    }
+	if (provider === 'lmstudio') {
+		// Use environment variable if set, otherwise default to localhost:1234/v1
+		return env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1';
+	}
 
-    if (provider === 'qwen') {
-        return llmConfig.baseURL || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-    }
+	if (provider === 'qwen') {
+		return llmConfig.baseURL || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+	}
 
 	// TODO: Consider if this is necessary
 	if (provider === 'deepseek') {
@@ -92,57 +92,57 @@ function getOpenAICompatibleBaseURL(llmConfig: LLMConfig): string {
 }
 
 function _createLLMService(
-    config: LLMConfig,
-    mcpManager: MCPManager,
-    contextManager: ContextManager,
-    unifiedToolManager?: UnifiedToolManager,
-    eventManager?: EventManager
+	config: LLMConfig,
+	mcpManager: MCPManager,
+	contextManager: ContextManager,
+	unifiedToolManager?: UnifiedToolManager,
+	eventManager?: EventManager
 ): ILLMService {
-    // Extract and validate API key
-    const apiKey = extractApiKey(config);
-    const baseURL = getOpenAICompatibleBaseURL(config);
-    const providerType = mapProviderToUnifiedType(config.provider);
+	// Extract and validate API key
+	const apiKey = extractApiKey(config);
+	const baseURL = getOpenAICompatibleBaseURL(config);
+	const providerType = mapProviderToUnifiedType(config.provider);
 
-    // Create unified configuration
-    const unifiedConfig: ExtendedLLMConfig = {
-        provider: providerType,
-        model: config.model,
-        apiKey: apiKey !== 'not-required' ? apiKey : undefined,
-        baseURL: baseURL || undefined,
-        maxIterations: config.maxIterations,
-        streaming: false, // Can be made configurable
-    };
+	// Create unified configuration
+	const unifiedConfig: ExtendedLLMConfig = {
+		provider: providerType,
+		model: config.model,
+		apiKey: apiKey !== 'not-required' ? apiKey : undefined,
+		baseURL: baseURL || undefined,
+		maxIterations: config.maxIterations,
+		streaming: false, // Can be made configurable
+	};
 
-    // Add provider-specific configurations
-    switch (providerType) {
-        case 'aws':
-            unifiedConfig.region = config.aws?.region || process.env.AWS_DEFAULT_REGION || 'us-east-1';
-            unifiedConfig.awsConfig = config.aws;
-            unifiedConfig.inferenceProfileArn = config.aws?.inferenceProfileArn;
-            break;
+	// Add provider-specific configurations
+	switch (providerType) {
+		case 'aws':
+			unifiedConfig.region = config.aws?.region || process.env.AWS_DEFAULT_REGION || 'us-east-1';
+			unifiedConfig.awsConfig = config.aws;
+			unifiedConfig.inferenceProfileArn = config.aws?.inferenceProfileArn;
+			break;
 
-        case 'azure':
-            unifiedConfig.endpoint = config.azure?.endpoint || process.env.AZURE_OPENAI_ENDPOINT;
-            unifiedConfig.deployment = config.azure?.deployment;
-            unifiedConfig.apiVersion = config.azure?.apiVersion;
-            unifiedConfig.resourceName = config.azure?.resourceName;
-            break;
+		case 'azure':
+			unifiedConfig.endpoint = config.azure?.endpoint || process.env.AZURE_OPENAI_ENDPOINT;
+			unifiedConfig.deployment = config.azure?.deployment;
+			unifiedConfig.apiVersion = config.azure?.apiVersion;
+			unifiedConfig.resourceName = config.azure?.resourceName;
+			break;
 
-        case 'qwen':
-            unifiedConfig.enableThinking = config.qwenOptions?.enableThinking;
-            unifiedConfig.thinkingBudget = config.qwenOptions?.thinkingBudget;
-            break;
+		case 'qwen':
+			unifiedConfig.enableThinking = config.qwenOptions?.enableThinking;
+			unifiedConfig.thinkingBudget = config.qwenOptions?.thinkingBudget;
+			break;
 
-        case 'openrouter':
-            unifiedConfig.baseURL = 'https://openrouter.ai/api/v1';
-            break;
+		case 'openrouter':
+			unifiedConfig.baseURL = 'https://openrouter.ai/api/v1';
+			break;
 
-        case 'ollama':
-        case 'lmstudio':
-        case 'vllm':
-            // baseURL already set above
-            break;
-    }
+		case 'ollama':
+		case 'lmstudio':
+		case 'vllm':
+			// baseURL already set above
+			break;
+	}
 
 			const OpenAIClass = require('openai');
 			const openai = new OpenAIClass({ apiKey, baseURL });
@@ -206,72 +206,72 @@ function _createLLMService(
 }
 
 export function createLLMService(
-    config: LLMConfig,
-    mcpManager: MCPManager,
-    contextManager: ContextManager,
-    unifiedToolManager?: UnifiedToolManager,
-    eventManager?: EventManager
+	config: LLMConfig,
+	mcpManager: MCPManager,
+	contextManager: ContextManager,
+	unifiedToolManager?: UnifiedToolManager,
+	eventManager?: EventManager
 ): ILLMService {
-    logger.info(`Creating LLM service for provider: ${config.provider}`, {
-        model: config.model,
-        hasUnifiedToolManager: !!unifiedToolManager,
-        hasEventManager: !!eventManager,
-    });
+	logger.info(`Creating LLM service for provider: ${config.provider}`, {
+		model: config.model,
+		hasUnifiedToolManager: !!unifiedToolManager,
+		hasEventManager: !!eventManager,
+	});
 
-    const service = _createLLMService(
-        config, 
-        mcpManager, 
-        contextManager, 
-        unifiedToolManager, 
-        eventManager
-    );
+	const service = _createLLMService(
+		config,
+		mcpManager,
+		contextManager,
+		unifiedToolManager,
+		eventManager
+	);
 
-    // Configure token-aware compression for the context manager
-    configureCompressionForService(config, contextManager);
+	// Configure token-aware compression for the context manager
+	configureCompressionForService(config, contextManager);
 
-    logger.info(`Successfully created unified LLM service for ${config.provider}`, {
-        model: config.model,
-        provider: config.provider,
-    });
+	logger.info(`Successfully created unified LLM service for ${config.provider}`, {
+		model: config.model,
+		provider: config.provider,
+	});
 
-    return service;
+	return service;
 }
 
 /**
  * Configure compression settings for the context manager based on LLM config
  */
 async function configureCompressionForService(
-    config: LLMConfig,
-    contextManager: ContextManager
+	config: LLMConfig,
+	contextManager: ContextManager
 ): Promise<void> {
-    try {
-        // Extract provider and model info
-        const provider = config.provider.toLowerCase();
-        const model = config.model;
+	try {
+		// Extract provider and model info
+		const provider = config.provider.toLowerCase();
+		const model = config.model;
 
-        // Get context window size from defaults since it's not in config
-        const contextWindow = getDefaultContextWindow(provider, model);
+		// Get context window size from defaults since it's not in config
+		const contextWindow = getDefaultContextWindow(provider, model);
 
-        // Configure compression asynchronously to avoid blocking service creation
-        setImmediate(async () => {
-            try {
-                await contextManager.configureCompression(provider, model, contextWindow);
-                logger.debug('Token-aware compression configured for LLM service', {
-                    provider,
-                    model,
-                    contextWindow,
-                });
-            } catch (error) {
-                logger.warn('Failed to configure compression for LLM service', {
-                    error: (error as Error).message,
-                    provider,
-                    model,
-                });
-            }
-        });
-    } catch (error) {
-        logger.error('Error in compression configuration', { error });
-    }
+		// Configure compression asynchronously to avoid blocking service creation
+		setImmediate(async () => {
+			try {
+				await contextManager.configureCompression(provider, model, contextWindow);
+				logger.debug('Token-aware compression configured for LLM service', {
+					provider,
+					model,
+					contextWindow,
+				});
+			} catch (error) {
+				logger.warn('Failed to configure compression for LLM service', {
+					error: (error as Error).message,
+					provider,
+					model,
+				});
+			}
+		});
+	} catch (error) {
+		logger.error('Error in compression configuration', { error });
+	}
 }
 
 /**
@@ -326,10 +326,10 @@ function getDefaultContextWindow(provider: string, model?: string): number {
 		},
 	};
 
-    const providerDefaults = defaults[provider];
-    if (!providerDefaults) {
-        return 8192; // Global fallback
-    }
+	const providerDefaults = defaults[provider];
+	if (!providerDefaults) {
+		return 8192; // Global fallback
+	}
 
-    return providerDefaults[model || 'default'] || providerDefaults.default || 8192;
+	return providerDefaults[model || 'default'] || providerDefaults.default || 8192;
 }
