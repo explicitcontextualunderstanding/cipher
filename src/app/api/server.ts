@@ -207,6 +207,12 @@ export class ApiServer {
 			logger.debug('[API Server] SSE Request Headers:', req.headers);
 			logger.debug('[API Server] SSE Request URL:', req.url);
 
+			// Disable socket timeouts specifically for SSE connections to prevent premature disconnections
+			req.socket.setTimeout(0);
+			if (res.socket) {
+				res.socket.setTimeout(0);
+			}
+
 			// Create SSE transport instance. The buildApiRoute('/mcp') is the endpoint where client will POST messages.
 			// The SSEServerTransport will handle setting the SSE headers itself
 			const sseTransport = new SSEServerTransport(this.buildApiRoute('/mcp'), res);
@@ -579,7 +585,8 @@ export class ApiServer {
 		// API routes
 		this.app.use(this.buildApiRoute('/message'), createMessageRoutes(this.agent));
 		this.app.use(this.buildApiRoute('/sessions'), createSessionRoutes(this.agent));
-		this.app.use(this.buildApiRoute('/mcp'), createMcpRoutes(this.agent));
+		// Note: /mcp route intentionally excluded to allow SSE handlers to take precedence
+		// The general /mcp router was intercepting SSE requests and returning "Accepted" instead of proper SSE streams
 		this.app.use(this.buildApiRoute('/llm'), createLlmRoutes(this.agent));
 		this.app.use(this.buildApiRoute('/config'), createConfigRoutes(this.agent));
 		this.app.use(this.buildApiRoute('/search'), createSearchRoutes(this.agent));
@@ -768,6 +775,12 @@ export class ApiServer {
 			try {
 				// Create HTTP server from Express app
 				this.httpServer = http.createServer(this.app);
+
+				// Configure server timeout for SSE connections
+				// Set a longer timeout to prevent premature SSE disconnections (default is 60s)
+				this.httpServer.timeout = 300000; // 5 minutes for regular connections
+				this.httpServer.keepAliveTimeout = 65000; // 65 seconds for keep-alive
+				this.httpServer.headersTimeout = 66000; // 66 seconds for headers
 
 				// Set up WebSocket server if enabled
 				if (this.config.enableWebSocket) {
