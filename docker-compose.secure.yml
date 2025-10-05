@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  cipher-api:
+    build: .
+    image: cipher-api
+    ports:
+      - '3001:3000'
+    environment:
+      # API keys from environment (loaded by secure-cipher-start.sh)
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - QWEN_API_KEY=${QWEN_API_KEY}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+
+      # Static configuration
+      - CIPHER_API_PREFIX=""
+      - ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
+      - DISABLE_EMBEDDINGS=true
+      - NODE_ENV=development
+      - CIPHER_LOG_LEVEL=info
+      - REDACT_SECRETS=true
+      - STORAGE_CACHE_TYPE=in-memory
+      - STORAGE_DATABASE_TYPE=in-memory
+      - WEB_SEARCH_ENABLE=true
+      - WEB_SEARCH_ENGINE=duckduckgo
+      - WEB_SEARCH_SAFETY_MODE=strict
+      - WEB_SEARCH_MAX_RESULTS=2
+      - WEB_SEARCH_RATE_LIMIT=10
+      - CIPHER_MULTI_BACKEND=1
+      - SEARCH_MEMORY_TYPE=both
+      - VECTOR_STORE_TYPE=in-memory
+      - VECTOR_STORE_COLLECTION=knowledge_memory
+      - VECTOR_STORE_DIMENSION=1536
+      - VECTOR_STORE_DISTANCE=Cosine
+      - VECTOR_STORE_ON_DISK=false
+      - REFLECTION_VECTOR_STORE_COLLECTION=reflection_memory
+      - DISABLE_REFLECTION_MEMORY=true
+      - ENABLE_QUERY_REFINEMENT=true
+    command:
+      [
+        'sh',
+        '-c',
+        'node dist/src/app/index.cjs --mode api --port 3000 --host 0.0.0.0 --agent /app/memAgent/cipher.yml --mcp-transport-type sse',
+      ]
+    volumes:
+      - ./memAgent:/app/memAgent:ro
+      - cipher-data:/app/.cipher
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'sh',
+          '-c',
+          'wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  cipher-data:

@@ -342,7 +342,7 @@ program
 		async function startApiMode(agent: MemAgent, options: any): Promise<void> {
 			const port = parseInt(options.port) || 3001;
 			const host = options.host || 'localhost';
-			const mcpTransportType = options.mcpTransportType || undefined; // Pass through from CLI options
+			const mcpTransportType = options.mcpTransportType || process.env.MCP_TRANSPORT_TYPE || undefined; // Pass through from CLI options or environment
 			const mcpPort = options.mcpPort ? parseInt(options.mcpPort, 10) : undefined; // Pass through from CLI options
 			// Handle API prefix from environment variable or CLI option
 			const apiPrefix =
@@ -395,7 +395,7 @@ program
 			const apiPort = parseInt(options.port) || 3001;
 			const uiPort = parseInt(options.uiPort) || 3000;
 			const host = options.host || 'localhost';
-			const mcpTransportType = options.mcpTransportType || undefined;
+			const mcpTransportType = options.mcpTransportType || process.env.MCP_TRANSPORT_TYPE || undefined;
 			const mcpPort = options.mcpPort ? parseInt(options.mcpPort, 10) : undefined;
 			// Handle API prefix from environment variable or CLI option
 			const apiPrefix =

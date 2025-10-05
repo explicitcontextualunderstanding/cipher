@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cipher.autossh.watchdog</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/kieranlal/workspace/cipher/scripts/autossh_watchdog.sh</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>CIPHER_AUTOSSH_USER</key>
+    <string>amazon1148</string>
+    <key>CIPHER_AUTOSSH_HOST</key>
+    <string>192.168.1.117</string>
+    <key>CIPHER_AUTOSSH_REMOTE_PORT</key>
+    <string>3001</string>
+    <key>WATCHDOG_ALERT_THRESHOLD</key>
+    <string>3</string>
+  </dict>
+
+  <!-- Run every 60 seconds -->
+  <key>StartInterval</key>
+  <integer>60</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/kieranlal/Library/Logs/cipher-autossh-watchdog.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/kieranlal/Library/Logs/cipher-autossh-watchdog.log</string>
+
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>256</integer>
+  </dict>
+
+</dict>
+</plist>

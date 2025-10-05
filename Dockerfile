@@ -50,6 +50,21 @@ RUN addgroup -g 1001 -S cipher && adduser -S cipher -u 1001
 RUN mkdir -p /app/.cipher/database && \
     chown -R cipher:cipher /app/.cipher
 
+# Install Chrome for Puppeteer web search functionality
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    freetype-dev \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    && rm -rf /var/cache/apk/*
+
+# Tell Puppeteer to skip installing Chrome since we installed it manually
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 # Copy only essential production files
 COPY --from=builder --chown=cipher:cipher /app/dist ./dist
 COPY --from=builder --chown=cipher:cipher /app/node_modules ./node_modules

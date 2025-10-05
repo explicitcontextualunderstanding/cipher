@@ -13,15 +13,15 @@ mcpServers: {}
 
 # Choose ONLY ONE of the following LLM providers
 llm:
-  provider: openai
-  model: gpt-4.1-mini
-  apiKey: $OPENAI_API_KEY
-  maxIterations: 50
-
-  # provider: gemini
-  # model: gemini-2.5-flash
-  # apiKey: $GEMINI_API_KEY
+  # provider: openai
+  # model: gpt-4.1-mini
+  # apiKey: $OPENAI_API_KEY
   # maxIterations: 50
+
+  provider: gemini
+  model: gemini-2.5-flash
+  apiKey: $GEMINI_API_KEY
+  maxIterations: 50
 
   # provider: anthropic
   # model: claude-3-5-haiku-20241022
@@ -80,21 +80,22 @@ llm:
 
 # Embedding configuration: ONLY ONE of the following
 
-embedding:
-  type: openai
-  model: text-embedding-3-small
-  apiKey: $OPENAI_API_KEY
+# embedding:
+#   type: openai
+#   model: text-embedding-3-small
+#   apiKey: $OPENAI_API_KEY
 
   # type: ollama
   # model: mxbai-embed-large
   # baseUrl: $OLLAMA_BASE_URL
   # dimensions: 1024
 
-# Gemini:
-# embedding:
-#   type: gemini
-#   model: gemini-embedding-001
-#   apiKey: $GEMINI_API_KEY
+# Gemini OpenAI-compatible embeddings:
+embedding:
+  type: openai
+  model: text-embedding-004
+  apiKey: $GEMINI_API_KEY
+  baseUrl: https://generativelanguage.googleapis.com/v1beta/openai/
 
 # Ollama:
 # embedding:

@@ -240,7 +240,7 @@ class BashSessionManager {
  * Execute a bash command with optional session persistence
  */
 async function executeBashCommand(options: CommandOptions): Promise<CommandResult> {
-	const { command, timeout = 30000, workingDir, environment, shell = '/bin/bash' } = options;
+	const { command, timeout = 30000, workingDir, environment, shell = '/bin/sh' } = options;
 
 	logger.debug('Executing bash command', { command, timeout, workingDir });
 

@@ -33,6 +33,15 @@ data/
 logs/
 *.log
 
+# Local diagnostics and temporary artifacts (do not commit)
+podman_cipher_diag_*
+/tmp/cipher-*
+/tmp/autossh.log
+*.tmp
+*.bak
+.env.backup
+.env.*.backup
+
 # TypeScript cache
 *.tsbuildinfo
 
@@ -78,3 +87,10 @@ volumes/
 .kiro/steering/byterover-rules.md
 .qoder/rules/byterover-rules.md
 .augment/rules/byterover-rules.md
+
+# Podman diagnostic archives and temporary artifacts
+podman_cipher_diag_*
+*.tar.gz
+
+# Temporary and log files
+*.log

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cipher.autossh</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/kieranlal/workspace/cipher/scripts/autossh_start.sh</string>
+  </array>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Increase file descriptor limits to avoid 'Too many open files' errors -->
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>1024</integer>
+  </dict>
+  <key>HardResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>4096</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/kieranlal/Library/Logs/cipher-autossh.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/kieranlal/Library/Logs/cipher-autossh.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <!-- Set these to your user/host/key before copying into ~/Library/LaunchAgents -->
+    <key>CIPHER_AUTOSSH_USER</key>
+    <string>amazon1148</string>
+  <key>CIPHER_AUTOSSH_HOST</key>
+  <string>192.168.1.117</string>
+    <!-- Optionally set identity path if not using default agent -->
+    <key>CIPHER_AUTOSSH_IDENTITY</key>
+    <string></string>
+    <key>CIPHER_AUTOSSH_TARGET_PORT</key>
+    <string>3000</string>
+    <key>CIPHER_AUTOSSH_REMOTE_PORT</key>
+    <string>3001</string>
+    <key>CIPHER_AUTOSSH_LOCAL_PORT</key>
+    <string>3001</string>
+    <key>CIPHER_AUTOSSH_BIND_ADDR</key>
+    <string>127.0.0.1</string>
+    <!-- Enable autossh debug logging and direct it to a stable temp logfile -->
+    <key>AUTOSSH_DEBUG</key>
+    <string>1</string>
+    <key>AUTOSSH_LOGFILE</key>
+    <string>/tmp/autossh.log</string>
+    <!-- Autossh reconnect timing controls -->
+    <key>AUTOSSH_POLL</key>
+    <string>30</string>
+    <key>AUTOSSH_FIRST_POLL</key>
+    <string>10</string>
+  </dict>
+
+</dict>
+</plist>

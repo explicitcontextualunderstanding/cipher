@@ -1,0 +1,42 @@
+From: Fix SSE Route Conflict <cipher@example.com>
+Date: Sat, 4 Oct 2025 16:10:00 +0000
+Subject: [PATCH] Fix SSE route conflict preventing MCP tool calls
+
+The issue: Express Router middleware was intercepting /mcp requests before SSE handlers,
+causing "Accepted" responses instead of proper SSE streams.
+
+Root cause: Route order - general router middleware defined before specific SSE routes.
+Solution: Move SSE route setup before general API routes to ensure proper precedence.
+
+diff --git a/src/app/api/server.ts b/src/app/api/server.ts
+index b67c5d4..1234567 100644
+--- a/src/app/api/server.ts
++++ b/src/app/api/server.ts
+@@ -589,10 +589,6 @@ export class ApiServer {
+ 		// API routes
+ 		this.app.use(this.buildApiRoute('/message'), createMessageRoutes(this.agent));
+ 		this.app.use(this.buildApiRoute('/sessions'), createSessionRoutes(this.agent));
+-		this.app.use(this.buildApiRoute('/mcp'), createMcpRoutes(this.agent));
+-		this.app.use(this.buildApiRoute('/llm'), createLlmRoutes(this.agent));
+-		this.app.use(this.buildApiRoute('/config'), createConfigRoutes(this.agent));
+-		this.app.use(this.buildApiRoute('/search'), createSearchRoutes(this.agent));
+-		this.app.use(this.buildApiRoute('/webhooks'), createWebhookRoutes(this.agent));
+
+ 		// Legacy endpoint for MCP server connection
+ 		this.app.post(this.buildApiRoute('/connect-server'), (req: Request, res: Response) => {
+@@ -606,6 +602,14 @@ export class ApiServer {
+
+ 		// Set up MCP SSE routes after API routes but before error handling
+ 		this.setupMcpSseRoutes();
++
++		// API routes - moved after SSE routes to prevent conflicts
++		this.app.use(this.buildApiRoute('/message'), createMessageRoutes(this.agent));
++		this.app.use(this.buildApiRoute('/sessions'), createSessionRoutes(this.agent));
++		this.app.use(this.buildApiRoute('/llm'), createLlmRoutes(this.agent));
++		this.app.use(this.buildApiRoute('/config'), createConfigRoutes(this.agent));
++		this.app.use(this.buildApiRoute('/search'), createSearchRoutes(this.agent));
++		this.app.use(this.buildApiRoute('/webhooks'), createWebhookRoutes(this.agent));
++		// Note: /mcp route intentionally excluded to allow SSE handlers to take precedence
+ 	}
+
+ 	/**

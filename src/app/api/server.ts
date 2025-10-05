@@ -539,6 +539,24 @@ export class ApiServer {
 
 	private setupRoutes(): void {
 		// Health check endpoint
+		// Fast health endpoint for infra checks that must always return
+		// quickly and deterministically. This endpoint avoids any optional
+		// telemetry or longer-running checks and is suitable for container
+		// healthchecks and load balancer probes.
+		this.app.get('/health/fast', (_req: Request, res: Response) => {
+			const body = JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString(), fast: true });
+			res.setHeader('Content-Type', 'application/json');
+			res.setHeader('Content-Length', Buffer.byteLength(body));
+			logger.info('[API Server] /health/fast - sending quick response');
+			res.end(body, () => {
+				logger.info('[API Server] /health/fast - response sent');
+			});
+		});
+
+		// Use an explicit JSON string body and set Content-Length so callers and
+		// proxies can clearly observe when the response completes. Add lightweight
+		// logging around send to help diagnose situations where the request is
+		// handled but the client never receives the body (timeouts / broken pipe).
 		this.app.get('/health', (_req: Request, res: Response) => {
 			const healthData: any = {
 				status: 'healthy',
@@ -556,7 +574,69 @@ export class ApiServer {
 				};
 			}
 
-			res.json(healthData);
+			// Capture high-resolution start time so we can measure how long the
+			// handler takes to prepare and flush the response. This helps detect
+			// handlers that appear to log activity but never actually complete
+			// the HTTP exchange.
+			const startHr = process.hrtime.bigint();
+			const startIso = new Date().toISOString();
+
+			try {
+				const body = JSON.stringify(healthData);
+				res.setHeader('Content-Type', 'application/json');
+				res.setHeader('Content-Length', Buffer.byteLength(body));
+				logger.info('[API Server] /health - sending response', { start: startIso, length: body.length });
+
+				// Use the res.end callback to log when the response has been
+				// flushed from the Node.js process. Note this does not
+				// guarantee delivery to the remote peer, but it shows the
+				// server finished writing the response.
+				res.end(body, () => {
+					try {
+						const endHr = process.hrtime.bigint();
+						const durationMs = Number(endHr - startHr) / 1e6;
+						logger.info('[API Server] /health - response sent', {
+							start: startIso,
+							end: new Date().toISOString(),
+							durationMs: Number(durationMs.toFixed(3)),
+						});
+					} catch (cbErr) {
+						logger.warn('[API Server] /health - response sent but failed to compute duration', { error: cbErr instanceof Error ? cbErr.message : String(cbErr) });
+					}
+				});
+			} catch (err) {
+				try {
+					const endHr = process.hrtime.bigint();
+					const durationMs = Number(endHr - startHr) / 1e6;
+					logger.error('[API Server] /health - failed to send response', {
+						error: err instanceof Error ? err.message : String(err),
+						start: startIso,
+						durationMs: Number(durationMs.toFixed(3)),
+					});
+				} catch (logErr) {
+					logger.error('[API Server] /health - failed to send response (could not record duration)', {
+						originalError: err instanceof Error ? err.message : String(err),
+						durationError: logErr instanceof Error ? logErr.message : String(logErr),
+					});
+				}
+
+				// Fall back to express json helper if explicit send fails
+				try {
+					const fallbackStart = process.hrtime.bigint();
+					res.json(healthData);
+					const fallbackEnd = process.hrtime.bigint();
+					const fallbackDurationMs = Number(fallbackEnd - fallbackStart) / 1e6;
+					logger.info('[API Server] /health - fallback json sent', { start: startIso, durationMs: Number(fallbackDurationMs.toFixed(3)) });
+				} catch (e) {
+					logger.error('[API Server] /health - fallback json also failed', { error: e instanceof Error ? e.message : String(e) });
+					// Ensure connection closes
+					try {
+						res.status(500).end();
+					} catch (endErr) {
+						logger.error('[API Server] /health - failed to close response after errors', { error: endErr instanceof Error ? endErr.message : String(endErr) });
+					}
+				}
+			}
 		});
 
 		// WebSocket stats endpoint
