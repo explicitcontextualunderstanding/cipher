@@ -367,3 +367,57 @@ sudo ss -ltnp | grep :3001 || true
 
 - Check autossh logs: `tail -f /tmp/autossh.log` or LaunchAgent logs
 - Monitor LaunchAgent status: `launchctl list | grep autossh`
+
+### Validate MCP SSE (client checks)
+
+In addition to using `curl` for basic health checks, validate the MCP Server-Sent Events (SSE) endpoint using the MCP client and simple streaming tools so you can confirm an active subscription.
+
+1) Quick client status (Claude CLI)
+
+```bash
+# Quick connection state reported by the Claude MCP client
+claude mcp list
+# Expected line (when connected):
+# cipher: http://localhost:3000/mcp/sse (SSE) - ✓ Connected
+```
+
+2) Active SSE test with curl
+
+```bash
+# Keep the connection open and show incoming SSE frames (no buffering)
+curl -v --no-buffer --max-time 60 http://127.0.0.1:3000/mcp/sse
+```
+
+What to look for:
+- HTTP/1.1 200 OK and a `Content-Type: text/event-stream` header.
+- Lines beginning with `event:` and/or `data:`. A `data:` line containing JSON indicates the MCP service is publishing events.
+
+3) Active SSE test with a small Python script (more robust parsing)
+
+```python
+#!/usr/bin/env python3
+import requests
+
+URL = 'http://127.0.0.1:3000/mcp/sse'
+with requests.get(URL, stream=True, timeout=10) as r:
+  r.raise_for_status()
+  print('Status:', r.status_code, 'Content-Type:', r.headers.get('content-type'))
+  # Read a few lines from the event stream
+  for i, line in enumerate(r.iter_lines(decode_unicode=True)):
+    if line:
+      print(line)
+    if i >= 20:
+      break
+
+# Install requirements: pip install requests
+```
+
+4) If your MCP client supports an explicit subscribe command
+
+If the MCP client (for example the Claude CLI) provides an explicit subscribe or stream command, use that to observe the SSE lifecycle and incoming events. If not, the `curl` and Python examples above provide equivalent streaming validations.
+
+Interpretation
+
+- If `claude mcp list` reports the SSE endpoint as connected and `curl`/Python show incoming `data:` frames, the tunnel is functioning end-to-end and events are reaching the MCP client.
+- If `claude mcp list` shows the endpoint as failed but `curl` on the Jetson (127.0.0.1:3001) returns the health JSON, the reverse tunnel may be intermittent or autossh is not running on the Mac. Use the diagnostic helpers to reproduce and collect logs.
+- If `curl` returns `HTTP/000` or a connection error from the Mac host, confirm the local Podman/GVProxy host mapping (`lsof`/`podman ps`) and that the local service is reachable at `127.0.0.1:3000` before re-testing the tunnel.
