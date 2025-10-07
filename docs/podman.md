@@ -29,6 +29,84 @@ Recommended workflow
 3. Deploy the stack with `podman compose` or `podman-compose` while the
    client is connected to the correct machine.
 
+## Cipher Container Setup
+
+### Secrets Management
+
+Create and mount secrets into the Podman VM for secure API key storage:
+
+```bash
+# Create secrets from files containing your API keys
+podman secret create cipher-gemini-api-key path/to/gemini.key
+podman secret create cipher-zai-api-key path/to/zai.key
+
+# Verify secrets are available in the VM
+podman secret ls
+```
+
+### Container Port Exposure
+
+The Cipher container uses gvproxy to expose port 3000 from the VM to the host:
+
+```bash
+# gvproxy forwards host port 3000 to VM port 3000
+*:3000 (host) → VM:3000 → container:3000
+
+# Check if gvproxy is properly forwarding
+lsof -i :3000
+# Should show: gvproxy LISTEN *:3000
+```
+
+### Container Health Checks
+
+The Cipher container includes health endpoints for monitoring:
+
+```bash
+# Standard health check
+curl http://localhost:3000/health
+
+# Fast health check (for container healthcheck)
+curl http://localhost:3000/health/fast
+```
+
+### Validation Commands
+
+Use these commands to validate your container setup:
+
+```bash
+# Check container status
+podman ps
+# Should show cipher_cipher-api_1 container as "Up" and healthy
+
+# Verify port binding on host
+ss -tulpn | grep :3000
+# Should show gvproxy or similar process listening
+
+# Test from within the VM (if needed)
+podman machine ssh podman-machine-slirp
+curl http://localhost:3000/health
+```
+
+### Docker Compose Integration
+
+The `docker-compose.yml` automatically handles secrets mounting:
+
+```yaml
+secrets:
+  cipher-gemini-api-key:
+    external: true
+  cipher-zai-api-key:
+    external: true
+
+services:
+  cipher-api:
+    secrets:
+      - cipher-gemini-api-key
+      - cipher-zai-api-key
+```
+
+The `scripts/load-secret.sh` script loads secrets into environment variables at container startup.
+
 Troubleshooting
 
 - If `curl http://localhost:3000/health` times out: check
@@ -41,4 +119,103 @@ Troubleshooting
   podman machine rm podman-machine-default
   ```
 
+SSH tunnel OK but host mapping failing
+
+If you've validated the SSH reverse tunnel (for example, using
+`scripts/diagnose/tunnel-replay.sh` or a manual `ssh -R` test) and the
+remote side reports the health endpoint is reachable, but the macOS host
+(`localhost:3000`) still returns connection errors, the problem is most
+likely the host-side port forward (gvproxy) or an old Podman machine owning
+the host port.
+
+Checklist (non-destructive)
+
+1. Confirm the tunnel: on the remote host (Jetson) the forwarded port should
+  show a listener and return the service health:
+
+```bash
+ssh user@jetson 'ss -ltnp | grep :3001 || true'
+ssh user@jetson 'curl -sS --max-time 5 http://127.0.0.1:3001/health || echo "remote-curl-failed"'
+```
+
+1. Confirm the container is healthy inside the Podman VM (run inside the VM):
+
+```bash
+podman machine ssh <your-machine> "curl -sS --max-time 5 http://localhost:3000/health || echo vm-curl-failed"
+```
+
+1. If the VM responds but the macOS host `localhost:3000` does not, inspect
+  the host-side forward process and the Podman machines:
+
+```bash
+# Who owns host port 3000?
+sudo lsof -nP -iTCP:3000 -sTCP:LISTEN
+
+# Which Podman machines exist and their state
+podman machine ls
+```
+
+1. If `lsof` shows `gvproxy` owning the port but the machine is an older
+  machine (not the one you expect to be using), stop/remove the stale
+  machine rather than killing processes directly:
+
+```bash
+podman machine stop <old-machine-name>
+podman machine rm <old-machine-name>
+```
+
+1. Start or recreate the desired machine using user-mode networking (slirp)
+  for predictable host mapping (recommended for local dev):
+
+```bash
+podman machine init --user-mode-networking --name podman-machine-slirp
+podman machine start podman-machine-slirp
+podman system connection default podman-machine-slirp
+```
+
+1. Restart your compose stack (or the single container) so gvproxy is created
+  by the active machine and binds host ports correctly:
+
+```bash
+# From repo root
+podman compose up -d
+podman ps
+```
+
+1. Re-check the host binding and health endpoint on macOS:
+
+```bash
+sudo lsof -nP -iTCP:3000 -sTCP:LISTEN
+curl -v --max-time 5 http://127.0.0.1:3000/health
+```
+
+If you still see a mismatch (VM responds, host does not) and `podman machine
+ls` shows only the expected machine, consider restarting the Podman service
+or rebooting the host to clear stale `gvproxy` processes created by removed
+machines.
+
+CAUTION: Avoid killing `gvproxy` or other system processes directly unless
+you understand which Podman machine created them. Prefer stopping/removing
+Podman machines and restarting the Podman-managed VM so the runtime recreates
+`gvproxy` properly.
+
 See also: `docs/vscode-ports.md` and `docs/ssh-tunnel.md`.
+
+Remote owner capture helper
+
+If the tunnel/forwarding behavior is intermittent and you need to capture who
+is claiming the remote port (for example, VS Code server or an orphaned test
+process), use `scripts/autossh/log_port_owner.sh` (local) to sample remote
+port owner information and write it to `$HOME/Library/Logs/cipher-port-owner-history.log`.
+
+To allow non-interactive `lsof` on the Jetson (so samples include the process
+owner lines without prompting for sudo), run the helper on the Jetson to add
+a minimal sudoers fragment:
+
+```bash
+# On Jetson (run as root or with sudo):
+sudo ./scripts/autossh/install_passwordless_lsof.sh amazon1148
+```
+
+After installing passwordless `lsof` for the diagnostic user, run the owner
+collector from your Mac and review the log to locate intermittent port steals.

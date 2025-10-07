@@ -5,6 +5,22 @@
   <key>Label</key>
   <string>com.cipher.autossh</string>
 
+  <!--
+    INSTRUCTIONS:
+    - This LaunchAgent intentionally disables automatic alternate-port fallback by default to avoid
+      accidental port churn on dedicated tunnel ports (e.g. 3001).
+    - To enable alternate-port fallback for transient diagnostics only, set these environment
+      variables in the plist or your shell before loading the LaunchAgent:
+        CIPHER_AUTOSSH_ENABLE_ALT_ON_BLOCK=true
+        CIPHER_AUTOSSH_ALT_REMOTE_PORT=3002
+        CIPHER_AUTOSSH_WAIT_TIMEOUT=60
+    - Do NOT enable fallback for production/dedicated ports. Instead, diagnose and resolve the root
+      cause of port contention using the helper script:
+        scripts/autossh/log_port_owner.sh user@host <port> [-n samples] [-i interval]
+    - The helper records remote owner/process details to $HOME/Library/Logs/cipher-port-owner-history.log
+      for manual inspection; it does not poll continuously.
+  -->
+
   <key>ProgramArguments</key>
   <array>
     <string>/Users/kieranlal/workspace/cipher/scripts/autossh_start.sh</string>
@@ -45,14 +61,19 @@
     <!-- Optionally set identity path if not using default agent -->
     <key>CIPHER_AUTOSSH_IDENTITY</key>
     <string></string>
-    <key>CIPHER_AUTOSSH_TARGET_PORT</key>
-    <string>3000</string>
-    <key>CIPHER_AUTOSSH_REMOTE_PORT</key>
-    <string>3001</string>
-    <key>CIPHER_AUTOSSH_LOCAL_PORT</key>
-    <string>3001</string>
-    <key>CIPHER_AUTOSSH_BIND_ADDR</key>
-    <string>127.0.0.1</string>
+  <key>CIPHER_AUTOSSH_TARGET_PORT</key>
+  <string>3000</string>
+  <key>CIPHER_AUTOSSH_REMOTE_PORT</key>
+  <string>3001</string>
+  <key>CIPHER_AUTOSSH_LOCAL_PORT</key>
+  <string>3001</string>
+  <key>CIPHER_AUTOSSH_BIND_ADDR</key>
+  <string>127.0.0.1</string>
+  <!-- Do NOT automatically fall back to an alternate remote port by default. -->
+  <key>CIPHER_AUTOSSH_ENABLE_ALT_ON_BLOCK</key>
+  <string>false</string>
+  <key>CIPHER_AUTOSSH_ALT_REMOTE_PORT</key>
+  <string></string>
     <!-- Enable autossh debug logging and direct it to a stable temp logfile -->
     <key>AUTOSSH_DEBUG</key>
     <string>1</string>
