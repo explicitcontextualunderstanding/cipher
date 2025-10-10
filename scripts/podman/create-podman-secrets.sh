@@ -3,7 +3,26 @@ set -euo pipefail
 
 # Idempotent, non-interactive bulk secret creation helper.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/podman/secret_utils.sh"
+source "$SCRIPT_DIR/secret_utils.sh"
+
+# CLI flags
+CREATE_PLACEHOLDERS=false
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --create-placeholders)
+            CREATE_PLACEHOLDERS=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--create-placeholders]"
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
 
 echo "🔐 Ensuring Podman secrets (idempotent, non-interactive)..."
 
@@ -41,8 +60,29 @@ ensure_secret_from_sources QWEN_API_KEY "kieran@rossollc.com" QWEN_API_KEY ciphe
 ensure_secret_from_sources VOYAGE_API_KEY "kieran@rossollc.com" VOYAGE_API_KEY cipher-voyage-api-key
 ensure_secret_from_sources DEEPSEEK_API_KEY "kieran@rossollc.com" DEEPSEEK_API_KEY cipher-deepseek-api-key
 
+# Optional secret names (used only for placeholders if requested)
+OPTIONAL_SECRETS=(
+    cipher-openrouter-api-key
+    cipher-qwen-api-key
+    cipher-voyage-api-key
+    cipher-openai-api-key
+    cipher-deepseek-api-key
+)
+
+if [ "$CREATE_PLACEHOLDERS" = true ]; then
+    echo "🔧 --create-placeholders: Creating placeholder secrets for missing optional providers"
+    for s in "${OPTIONAL_SECRETS[@]}"; do
+        if ! podman_secret_exists "$s"; then
+            echo "[placeholder] Creating placeholder secret: $s"
+            create_or_replace_secret_from_value "$s" "placeholder"
+        else
+            echo "[exists] Secret already present: $s"
+        fi
+    done
+fi
+
 echo ""
 echo "✅ Podman secrets ensured"
 echo ""
 echo "📋 List created secrets:"
-podman secret list | grep cipher || true
+    "$PODMAN_BIN" secret list | grep cipher || true

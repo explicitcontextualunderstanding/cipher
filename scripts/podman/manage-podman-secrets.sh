@@ -2,6 +2,8 @@
 
 # Manage Podman secrets for Cipher
 # Usage: ./scripts/manage-podman-secrets.sh [create|delete|list|recreate]
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/secret_utils.sh"
 
 set -e
 
@@ -16,20 +18,20 @@ case "$COMMAND" in
   "recreate")
     echo "🔄 Recreating Podman secrets..."
     echo "🗑️  Deleting existing secrets..."
-    podman secret list | grep cipher | awk '{print $2}' | xargs -I {} podman secret rm {} 2>/dev/null || true
+  "$PODMAN_BIN" secret list | grep cipher | awk '{print $2}' | xargs -I {} "$PODMAN_BIN" secret rm {} 2>/dev/null || true
     echo "🔐 Creating new secrets..."
     ./scripts/create-podman-secrets.sh
     ;;
 
   "delete")
     echo "🗑️  Deleting Podman secrets..."
-    podman secret list | grep cipher | awk '{print $2}' | xargs -I {} podman secret rm {} 2>/dev/null || true
+  "$PODMAN_BIN" secret list | grep cipher | awk '{print $2}' | xargs -I {} "$PODMAN_BIN" secret rm {} 2>/dev/null || true
     echo "✅ Secrets deleted"
     ;;
 
   "list")
     echo "📋 Current Podman secrets:"
-    podman secret list | grep cipher || echo "No cipher secrets found"
+  "$PODMAN_BIN" secret list | grep cipher || echo "No cipher secrets found"
     ;;
 
   *)

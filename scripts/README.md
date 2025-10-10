@@ -7,7 +7,11 @@ High-level guidance:
 - Canonical operational guidance (workflows, examples, security best practices) is in `docs/secrets.md`.
 - Use the individual scripts below for automation and ad-hoc operations. The scripts are intended to be runnable from the repository root (e.g. `./scripts/create-gemini-secret.sh`).
 
-Key scripts (short summary) and locations after reorganization:
+ Key scripts (short summary) and locations after reorganization:
+
+Diagnostics
+
+- `diagnose/tunnel-replay.sh` — automate the reverse-tunnel troubleshooting checklist (stop autossh, start a manual SSH reverse forward, run remote checks and optionally re-enable autossh). Useful when diagnosing port conflicts or VS Code remote auto-forwards.
 
 - `scripts/podman/` — Podman-related helpers and idempotent secret primitives:
   - `create-gemini-secret.sh` — create/replace the `cipher-gemini-api-key` Podman secret (non-interactive; falls back to env/KeyChain).

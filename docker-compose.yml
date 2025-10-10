@@ -20,7 +20,7 @@ services:
       ]
     volumes:
       - ./memAgent:/app/memAgent:ro
-      - ./scripts/load-secret.sh:/tmp/load-secret.sh:ro
+      - ./scripts/run/load-secret.sh:/tmp/load-secret.sh:ro
       - cipher-data:/app/.cipher
     # podman-compose does not support `target` mapping for secrets; use
     # the simple list form so the secret is mounted by its name into

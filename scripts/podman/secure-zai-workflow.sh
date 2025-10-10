@@ -8,6 +8,10 @@ TEMP_FILE="/tmp/cipher-zai-api-key.txt"
 echo "🔐 Secure Podman secrets workflow for ANTHROPIC_API_KEY (Z.ai)"
 echo "============================================="
 
+# source helper to get PODMAN_BIN
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/secret_utils.sh"
+
 echo "🔑 Step 1: Retrieving ANTHROPIC API key from KeyChain or environment..."
 
 # Try multiple KeyChain service names to be tolerant of naming differences.
@@ -47,15 +51,15 @@ chmod 600 "$TEMP_FILE"
 echo "✅ Temporary file created: $TEMP_FILE"
 
 echo "🗑️  Step 3: Removing existing Podman secret (if any)..."
-if podman secret inspect "$SECRET_NAME" &>/dev/null; then
-    podman secret rm "$SECRET_NAME"
+if "$PODMAN_BIN" secret inspect "$SECRET_NAME" &>/dev/null; then
+    "$PODMAN_BIN" secret rm "$SECRET_NAME"
     echo "✅ Removed existing secret: $SECRET_NAME"
 else
     echo "ℹ️  No existing secret to remove"
 fi
 
 echo "🔐 Step 4: Creating Podman secret from temporary file..."
-podman secret create "$SECRET_NAME" "$TEMP_FILE"
+"$PODMAN_BIN" secret create "$SECRET_NAME" "$TEMP_FILE"
 if [ $? -eq 0 ]; then
     echo "✅ Podman secret created: $SECRET_NAME"
 else
@@ -73,7 +77,7 @@ else
 fi
 
 echo "📋 Verification"
-podman secret inspect "$SECRET_NAME" | head -n 20 || true
+ "$PODMAN_BIN" secret inspect "$SECRET_NAME" | head -n 20 || true
 
 echo "🚀 Ready to start Cipher with secure Z.ai secret!"
 echo "Usage: podman-compose up -d cipher-api"

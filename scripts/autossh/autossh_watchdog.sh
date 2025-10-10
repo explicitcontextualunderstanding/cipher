@@ -25,12 +25,11 @@ if [[ -f "$AUTOSSH_LOG" ]]; then
   if tail -n 500 "$AUTOSSH_LOG" | grep -E "remote forward success|forwarding_success" >/dev/null 2>&1; then
     echo "$(timestamp) watchdog: forward success found in autossh log" >> "$WATCHDOG_LOG"
     # Extra validation: try a short-run health check from the Jetson side
-    echo "$(timestamp) watchdog: performing remote health check via ${CIPHER_AUTOSSH_USER}@${CIPHER_AUTOSSH_HOST}:127.0.0.1:${CIPHER_AUTOSSH_REMOTE_PORT}" >> "$WATCHDOG_LOG"
-    REMOTE_URL="http://127.0.0.1:${CIPHER_AUTOSSH_REMOTE_PORT}/health"
-    # Run remote curl; capture both stdout and exit status
-    REMOTE_OUT=$(ssh -o ConnectTimeout=5 "${CIPHER_AUTOSSH_USER}@${CIPHER_AUTOSSH_HOST}" "curl -sS --max-time 5 '${REMOTE_URL}' || true" 2>/dev/null || true)
-    if [[ -n "$REMOTE_OUT" && "$REMOTE_OUT" == *'"status":"healthy"'* ]]; then
-      echo "$(timestamp) watchdog: remote health check OK" >> "$WATCHDOG_LOG"
+    echo "$(timestamp) watchdog: performing strict remote health + TCP probe via check_autossh_forward.sh" >> "$WATCHDOG_LOG"
+    # Use the stricter helper to validate both TCP accept and HTTP health. This
+    # provides a single exit code that indicates a fully functional forward.
+    if scripts/autossh/check_autossh_forward.sh --require-tcp --require-health "${CIPHER_AUTOSSH_USER}@${CIPHER_AUTOSSH_HOST}" >/dev/null 2>>"$WATCHDOG_LOG"; then
+      echo "$(timestamp) watchdog: remote health+tcp check OK" >> "$WATCHDOG_LOG"
       # Reset consecutive restart counter to 0 on success
       STATE_DIR="$HOME/Library/Application Support/cipher"
       STATE_FILE="$STATE_DIR/watchdog-restarts.count"
@@ -39,7 +38,7 @@ if [[ -f "$AUTOSSH_LOG" ]]; then
       echo "$(timestamp) watchdog: reset consecutive restarts to 0" >> "$WATCHDOG_LOG"
       exit 0
     else
-      echo "$(timestamp) watchdog: remote health check FAILED (no healthy status)" >> "$WATCHDOG_LOG"
+      echo "$(timestamp) watchdog: remote health+tcp check FAILED" >> "$WATCHDOG_LOG"
       # fall through to restart below
     fi
   fi

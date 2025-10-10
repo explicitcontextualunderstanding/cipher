@@ -88,10 +88,160 @@ All helper scripts live under `scripts/`.
 
 ## Example secret names used in the repo
 
-- `cipher-gemini-api-key` (Gemini / Google Generative API)
-- `cipher-zai-api-key` (Anthropic / Z.ai)
-- `cipher-openai-api-key`, `cipher-openrouter-api-key`, `cipher-qwen-api-key`, `cipher-voyage-api-key`, `cipher-deepseek-api-key`
+- Required for the recommended local development flow (minimal):
+  - `cipher-gemini-api-key` — Gemini (Google Generative) — used for embeddings only
+  - `cipher-zai-api-key` — Anthropic / Z.ai — used for the LLM (inference) only
+
+- Optional / integration keys (not required for the minimal dev flow):
+  - `cipher-openai-api-key`, `cipher-openrouter-api-key`, `cipher-qwen-api-key`, `cipher-voyage-api-key`, `cipher-deepseek-api-key`
+
+Why so many keys are listed?
+
+- Flexibility / multi-backend support: the codebase and compose files include plumbing to support multiple LLM and embedding providers so teams can swap providers or run fallbacks. That support is why the docs and scripts enumerate many provider-specific secret names.
+- Compose and scripts convenience: `docker-compose.podman-secrets.yml` and the secret helper scripts list a broad set of secrets so automated helpers can create or validate any provider-specific secret if you choose to use it.
+- Historical/optional integrations: other projects in this workspace (for example `SurfSense`) and shared tooling include support for TTS/STT and other provider integrations; the presence of provider names in other repos explains why the examples include them.
+
+Do you actually need all of them to run Cipher locally?
+
+- No. For a standard local development setup that exercises embedding + LLM functionality you only need Gemini for embeddings and Anthropic (Z.ai) for LLM calls. The other keys are optional and only required if you want to enable those specific provider integrations.
+
+How to reduce the required keys when using Podman / podman-compose
+
+Podman-compose requires declared top-level secrets and will fail if an `external` secret is listed but not present. To avoid failures when you don't have all provider keys locally, use one of these approaches:
+
+1. Use the minimal compose variant that references only Gemini + Z.ai. The default `docker-compose.podman-secrets.yml` now declares only these two required secrets.
+
+2. When you need optional provider integrations, either:
+   - Create the provider secrets using the secure workflows, or
+   - Include the optional override file once you have created the matching secrets:
+
+     podman compose -f docker-compose.podman-secrets.yml -f docker-compose.podman-secrets-optional.yml up -d
+
+3. For quick testing without real credentials, create non-secure placeholder secrets for optional providers (replace them with real secrets later):
+
+   ./scripts/podman/create-podman-secrets.sh --create-placeholders
+
+How we determined this (audit of container feedback and scripts)
+
+- The compose file used for Podman (`docker-compose.podman-secrets.yml`) lists many provider secret environment variables and service `secrets:` entries — podman-compose will refuse to start services if an external secret listed there does not exist (which is why you may have seen errors earlier during `podman compose up`).
+- The secret helper scripts (`scripts/podman/create-podman-secrets.sh`, `scripts/podman/secure-*`) attempt to create a broad set of provider secrets by default for convenience; they are idempotent and will skip secrets that have no data in KeyChain or env.
+- Application code and related repos show multi-provider support (examples / enums referencing OPENAI, ANTHROPIC, OPENROUTER, etc.) — this explains why the project documents and scripts enumerate many possible secret names even though a minimal dev run only needs two.
+
+Recommendation
+
+- For everyday local development: create only the Gemini and Anthropic secrets (use `scripts/podman/secure-gemini-workflow.sh` and `scripts/podman/secure-zai-workflow.sh`) and use the compose variant that only requires those secrets.
+- If you need support for an additional provider later, add that provider's KeyChain entry and run the matching `secure-*` script or create the Podman secret from a file or env variable.
 - `cipher-gcp-adc` (Google Application Default Credentials file)
+
+## Environment Variables for Cipher MCP SSE Service
+
+When running Cipher as an MCP SSE service with Podman secrets, the following environment variables are required:
+
+```bash
+# MCP Server Mode (required for aggregator mode)
+MCP_SERVER_MODE=aggregator
+
+# API Key File Paths (point to secrets mounted in container)
+GEMINI_API_KEY_FILE=/run/secrets/cipher-gemini-api-key
+ANTHROPIC_API_KEY_FILE=/run/secrets/cipher-zai-api-key
+
+# Optional: Additional configuration
+CIPHER_LOG_LEVEL=debug
+```
+
+## Podman Secrets Creation
+
+Create and use Podman secrets for secure API key storage:
+
+```bash
+# Create secrets from files containing your API keys
+podman secret create cipher-gemini-api-key path/to/gemini.key
+podman secret create cipher-zai-api-key path/to/zai.key
+
+# Verify secrets are available in the VM
+podman secret ls
+```
+
+## Docker Compose Integration
+
+Use secrets in your `docker-compose.yml` for secure key injection:
+
+```yaml
+version: "3.8"
+
+services:
+  cipher-api:
+    image: cipher-api
+    environment:
+      - CIPHER_LOG_LEVEL=debug
+      - MCP_SERVER_MODE=aggregator
+      - GEMINI_API_KEY_FILE=/run/secrets/cipher-gemini-api-key
+      - ANTHROPIC_API_KEY_FILE=/run/secrets/cipher-zai-api-key
+    secrets:
+      - cipher-gemini-api-key
+      - cipher-zai-api-key
+    command:
+      - '/tmp/load-secret.sh'
+    volumes:
+      - ./scripts/run/load-secret.sh:/tmp/load-secret.sh:ro
+
+secrets:
+  cipher-gemini-api-key:
+    external: true
+  cipher-zai-api-key:
+    external: true
+```
+
+## Load Script Usage
+
+The `scripts/load-secret.sh` script automatically loads secrets into environment variables at container startup:
+
+```bash
+#!/bin/bash
+# This script loads Podman secrets into environment variables
+
+echo "🔑 Loading API keys from Podman secrets..."
+if [ -f "/run/secrets/cipher-gemini-api-key" ]; then
+  export GEMINI_API_KEY=$(cat /run/secrets/cipher-gemini-api-key)
+  echo "✅ GEMINI_API_KEY loaded from secret file"
+fi
+
+if [ -f "/run/secrets/cipher-zai-api-key" ]; then
+  export ANTHROPIC_API_KEY=$(cat /run/secrets/cipher-zai-api-key)
+  echo "✅ ANTHROPIC_API_KEY (Z.ai) loaded from secret file"
+fi
+
+# Start Cipher with secure API keys
+echo "🚀 Starting Cipher with secure API keys in aggregator mode..."
+exec node dist/src/app/index.cjs --mode api --port 3000 --host 0.0.0.0
+```
+
+## MCP Connectivity Validation
+
+Use the `baseline-mcp-validation.sh` script to test connectivity and secret loading:
+
+```bash
+#!/bin/bash
+# MCP connectivity and secret validation script
+
+echo "🔍 Validating MCP service setup..."
+
+# Test health endpoint
+curl -s http://localhost:3000/health | jq .
+
+# Test SSE endpoint
+curl -s http://localhost:3000/mcp/sse --max-time 5
+
+# Verify MCP client can connect
+claude mcp list
+```
+
+This script validates:
+
+- Container health status
+- SSE endpoint accessibility
+- MCP client connectivity
+- Secret loading functionality
 
 ## Recommended development workflows
 

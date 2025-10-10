@@ -5,7 +5,7 @@ SECRET_NAME="cipher-gemini-api-key"
 
 # Load helper
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/podman/secret_utils.sh"
+source "$SCRIPT_DIR/secret_utils.sh"
 
 echo "🔐 Creating Podman secret (idempotent, non-interactive): $SECRET_NAME"
 

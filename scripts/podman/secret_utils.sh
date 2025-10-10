@@ -6,6 +6,18 @@ set -euo pipefail
 STATE_DIR="$HOME/.local/share/cipher/secrets"
 mkdir -p "$STATE_DIR"
 
+# Detect podman binary reliably in non-login shells. Prefer PATH lookup but
+# fall back to the common Homebrew location on macOS. Scripts should use
+# "$PODMAN_BIN" when invoking Podman to avoid silent failures when PATH is
+# different for non-interactive shells (for example when run by editors).
+if command -v podman >/dev/null 2>&1; then
+  PODMAN_BIN="$(command -v podman)"
+elif [ -x "/opt/homebrew/bin/podman" ]; then
+  PODMAN_BIN="/opt/homebrew/bin/podman"
+else
+  PODMAN_BIN=podman
+fi
+
 sha256_of_string() {
   local s="$1"
   if command -v sha256sum >/dev/null 2>&1; then
@@ -51,7 +63,7 @@ store_hash() {
 
 podman_secret_exists() {
   local secret_name="$1"
-  podman secret inspect "$secret_name" >/dev/null 2>&1
+  "$PODMAN_BIN" secret inspect "$secret_name" >/dev/null 2>&1
 }
 
 create_or_replace_secret_from_file() {
@@ -67,11 +79,11 @@ create_or_replace_secret_from_file() {
   fi
   if podman_secret_exists "$secret_name"; then
     echo "[replace] Podman secret '$secret_name' exists but content changed — replacing"
-    podman secret rm "$secret_name" || true
+  "$PODMAN_BIN" secret rm "$secret_name" || true
   else
     echo "[create] Podman secret '$secret_name' does not exist — creating"
   fi
-  podman secret create "$secret_name" "$file_path"
+  "$PODMAN_BIN" secret create "$secret_name" "$file_path"
   store_hash "$secret_name" "$new_hash"
 }
 

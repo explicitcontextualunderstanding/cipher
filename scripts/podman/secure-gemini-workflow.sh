@@ -12,6 +12,10 @@ TEMP_FILE="/tmp/cipher-gemini-api-key.txt"
 echo "🔐 Secure Podman secrets workflow for GEMINI_API_KEY"
 echo "============================================="
 
+# source helper to get PODMAN_BIN
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/secret_utils.sh"
+
 # Step 1: Retrieve secret from macOS KeyChain
 echo "🔑 Step 1: Retrieving GEMINI_API_KEY from KeyChain..."
 
@@ -41,8 +45,8 @@ echo "   Permissions: $(ls -la "$TEMP_FILE" | cut -d' ' -f1)"
 echo ""
 echo "🗑️  Step 3: Removing existing Podman secret (if any)..."
 
-if podman secret inspect "$SECRET_NAME" &>/dev/null; then
-    podman secret rm "$SECRET_NAME"
+if "$PODMAN_BIN" secret inspect "$SECRET_NAME" &>/dev/null; then
+    "$PODMAN_BIN" secret rm "$SECRET_NAME"
     echo "✅ Removed existing secret: $SECRET_NAME"
 else
     echo "ℹ️  No existing secret to remove"
@@ -52,7 +56,7 @@ fi
 echo ""
 echo "🔐 Step 4: Creating Podman secret from temporary file..."
 
-podman secret create "$SECRET_NAME" "$TEMP_FILE"
+"$PODMAN_BIN" secret create "$SECRET_NAME" "$TEMP_FILE"
 
 if [ $? -eq 0 ]; then
     echo "✅ Podman secret created: $SECRET_NAME"
@@ -81,7 +85,7 @@ echo "=============================================="
 
 echo ""
 echo "🔐 Secret details:"
-podman secret inspect "$SECRET_NAME" | head -10
+"$PODMAN_BIN" secret inspect "$SECRET_NAME" | head -10
 
 echo ""
 echo "🔒 Security benefits:"
