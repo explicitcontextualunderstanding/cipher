@@ -133,6 +133,14 @@ Recommendation
 - If you need support for an additional provider later, add that provider's KeyChain entry and run the matching `secure-*` script or create the Podman secret from a file or env variable.
 - `cipher-gcp-adc` (Google Application Default Credentials file)
 
+Note: to make bringing the stack up repeatable we provide a wrapper script:
+
+```bash
+./scripts/podman/compose-up.sh --create-placeholders --include-optional --wait-seconds 60
+```
+
+This wrapper ensures required secrets (optionally creating placeholders), starts the compose stack (including optional provider overrides when requested), and waits for the service health endpoint.
+
 ## Environment Variables for Cipher MCP SSE Service
 
 When running Cipher as an MCP SSE service with Podman secrets, the following environment variables are required:
