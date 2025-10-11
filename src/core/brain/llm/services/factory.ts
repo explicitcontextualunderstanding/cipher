@@ -166,49 +166,88 @@ function getOpenAICompatibleBaseURL(llmConfig: LLMConfig): string {
 					config.maxIterations,
 					unifiedToolManager
 				);
-			} catch (error) {
-				logger.error('Failed to create Gemini service', {
-					error: error instanceof Error ? error.message : String(error),
-					model: config.model,
-				});
-				throw error;
+			switch (providerType) {
+				case 'aws':
+					unifiedConfig.region = config.aws?.region || process.env.AWS_DEFAULT_REGION || 'us-east-1';
+					unifiedConfig.awsConfig = config.aws;
+					unifiedConfig.inferenceProfileArn = config.aws?.inferenceProfileArn;
+					break;
+
+				case 'azure':
+					unifiedConfig.endpoint = config.azure?.endpoint || process.env.AZURE_OPENAI_ENDPOINT;
+					unifiedConfig.deployment = config.azure?.deployment;
+					unifiedConfig.apiVersion = config.azure?.apiVersion;
+					unifiedConfig.resourceName = config.azure?.resourceName;
+					break;
+
+				case 'qwen': {
+					unifiedConfig.enableThinking = config.qwenOptions?.enableThinking;
+					unifiedConfig.thinkingBudget = config.qwenOptions?.thinkingBudget;
+					const OpenAIClass = require('openai');
+					const openai = new OpenAIClass({ apiKey, baseURL });
+					const qwenOptions: QwenOptions = {
+						...(config.qwenOptions?.enableThinking !== undefined && { enableThinking: config.qwenOptions.enableThinking }),
+						...(config.qwenOptions?.thinkingBudget !== undefined && { thinkingBudget: config.qwenOptions.thinkingBudget }),
+						...(config.qwenOptions?.temperature !== undefined && { temperature: config.qwenOptions.temperature }),
+						...(config.qwenOptions?.top_p !== undefined && { top_p: config.qwenOptions.top_p }),
+					};
+					return new QwenService(
+						openai,
+						config.model,
+						mcpManager,
+						contextManager,
+						config.maxIterations,
+						qwenOptions,
+						unifiedToolManager
+					);
+				}
+
+				case 'openrouter':
+					unifiedConfig.baseURL = 'https://openrouter.ai/api/v1';
+					break;
+
+				case 'ollama':
+				case 'lmstudio':
+				case 'vllm':
+					// baseURL already set above
+					break;
+
+				case 'gemini': {
+					logger.debug('Creating Gemini service', { model: config.model, hasApiKey: !!apiKey });
+					try {
+						return new GeminiService(
+							apiKey,
+							config.model,
+							mcpManager,
+							contextManager,
+							config.maxIterations,
+							unifiedToolManager
+						);
+					} catch (error) {
+						logger.error('Failed to create Gemini service', {
+							error: error instanceof Error ? error.message : String(error),
+							model: config.model,
+						});
+						throw error;
+					}
+				}
+
+				case 'deepseek': {
+					const OpenAIClass = require('openai');
+					const openai = new OpenAIClass({ apiKey, baseURL });
+					return new DeepseekService(
+						openai,
+						config.model,
+						mcpManager,
+						contextManager,
+						config.maxIterations,
+						unifiedToolManager
+					);
+				}
+
+				default:
+					throw new Error(`Unsupported LLM provider: ${config.provider}`);
 			}
-		}
-		case 'deepseek': {
-			const baseURL = getOpenAICompatibleBaseURL(config);
-			const OpenAIClass = require('openai');
-			const openai = new OpenAIClass({ apiKey, baseURL });
-			return new DeepseekService(
-				openai,
-				config.model,
-				mcpManager,
-				contextManager,
-				config.maxIterations,
-				unifiedToolManager
-			);
-		}
-		default:
-			throw new Error(`Unsupported LLM provider: ${config.provider}`);
-	}
-}
-
-export function createLLMService(
-	config: LLMConfig,
-	mcpManager: MCPManager,
-	contextManager: ContextManager,
-	unifiedToolManager?: UnifiedToolManager,
-	eventManager?: EventManager
-): ILLMService {
-	logger.info(`Creating LLM service for provider: ${config.provider}`, {
-		model: config.model,
-		hasUnifiedToolManager: !!unifiedToolManager,
-		hasEventManager: !!eventManager,
-	});
-
-	const service = _createLLMService(
-		config,
-		mcpManager,
-		contextManager,
 		unifiedToolManager,
 		eventManager
 	);
