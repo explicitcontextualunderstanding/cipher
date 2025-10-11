@@ -71,6 +71,13 @@ COPY --from=builder --chown=cipher:cipher /app/node_modules ./node_modules
 COPY --from=builder --chown=cipher:cipher /app/package.json ./
 COPY --from=builder --chown=cipher:cipher /app/memAgent ./memAgent
 
+# Copy the repository-provided universal entrypoint into the image and make it executable.
+# Ensure the entrypoint is owned by the runtime user so it can be executed without extra
+# permissions adjustments at container start time.
+COPY --chown=cipher:cipher scripts/run/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+
 # Create a minimal .env file for Docker (environment variables will be passed via docker)
 RUN echo "# Docker environment - variables passed via docker run" > .env
 
@@ -90,4 +97,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE $PORT
 
 # API server mode: REST APIs on single port
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["sh", "-c", "node dist/src/app/index.cjs --mode api --port $PORT --host 0.0.0.0 --agent $CONFIG_FILE"]

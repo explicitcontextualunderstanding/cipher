@@ -1,3 +1,14 @@
+# Makefile for local developer convenience
+
+.PHONY: dev-up help
+
+dev-up:
+	@echo "Bringing up dev environment (build + compose up)"
+	./scripts/podman/compose-up.sh --create-placeholders --include-optional --wait-seconds 60 --build
+
+help:
+	@echo "Available targets:"
+	@echo "  dev-up       Build images and bring the local podman compose stack up (dev)"
 # Makefile - helper tasks for Podman maintenance and slim builds
 
 .PHONY: podman-recreate podman-prune build-slim build tag run verify-context
@@ -35,7 +46,7 @@ run:
 	@echo "Run the cipher API container (port 3000)"
 	podman run --rm -p 3000:3000 --name cipher_api $(IMAGE_NAME)
 
-.PHONY: secrets-create secrets-from-env secure-start
+.PHONY: secrets-create secrets-from-env secure-start dev-up
 
 secrets-create:
 	@echo "Creating Podman secrets from KeyChain (if available)..."
@@ -62,3 +73,10 @@ secure-start: secrets-create secrets-from-env
 	else \
 		podman compose up -d cipher-api; \
 	fi
+
+# Convenience developer workflow: create any missing secrets (placeholders for
+# optional providers), bring up the compose stacks (including optional
+# provider overrides) and wait for a healthy service.
+dev-up:
+	@echo "Starting development stack (ensuring secrets and placeholders)..."
+	@./scripts/podman/compose-up.sh --create-placeholders --include-optional --wait-seconds 60

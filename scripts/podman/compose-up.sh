@@ -16,6 +16,7 @@ source "$SCRIPT_DIR/secret_utils.sh"
 CREATE_PLACEHOLDERS=false
 INCLUDE_OPTIONAL=false
 RECREATE=false
+DO_BUILD=false
 WAIT_SECONDS=60
 CHECK_LISTENERS=false
 
@@ -27,6 +28,7 @@ Options:
   --create-placeholders   Create non-secure placeholder secrets for optional providers
   --include-optional      Include optional provider compose overrides when bringing stack up
   --recreate              Run compose down (remove orphan volumes) before starting
+  --build                 Run a compose build for the configured compose files before starting
   --wait-seconds N        How long (seconds) to wait for a healthy HTTP /health (default: 60)
   --check-listeners       Show host listener state for ports 3000/3001 (may prompt for sudo)
   -h, --help              Show this help
@@ -49,6 +51,8 @@ while [ "$#" -gt 0 ]; do
       INCLUDE_OPTIONAL=true; shift ;;
     --recreate)
       RECREATE=true; shift ;;
+    --build)
+      DO_BUILD=true; shift ;;
     --wait-seconds)
       WAIT_SECONDS="$2"; shift 2 ;;
     --check-listeners)
@@ -85,13 +89,30 @@ fi
 
 if [ "$RECREATE" = true ]; then
   echo "Recreating stack: bringing down existing stack (if any)"
-  "$PODMAN_BIN" compose -f "${COMPOSE_FILES[@]}" down -v || true
+  COMPOSE_ARGS=()
+  for f in "${COMPOSE_FILES[@]}"; do
+    COMPOSE_ARGS+=(-f "$f")
+  done
+  "$PODMAN_BIN" compose "${COMPOSE_ARGS[@]}" down -v || true
 fi
 
 # Bring up stack
 echo "Bringing up stack: ${COMPOSE_FILES[*]}"
+# Optionally build images for the selected compose files
+if [ "$DO_BUILD" = true ]; then
+  echo "Building images for: ${COMPOSE_FILES[*]}"
+  BUILD_ARGS=()
+  for f in "${COMPOSE_FILES[@]}"; do
+    BUILD_ARGS+=(-f "$f")
+  done
+  "$PODMAN_BIN" compose "${BUILD_ARGS[@]}" build || echo "Warning: compose build failed" 
+fi
 # podman compose uses the external provider podman-compose under the hood on macOS in some installs
-"$PODMAN_BIN" compose -f "${COMPOSE_FILES[@]}" up -d --remove-orphans
+COMPOSE_ARGS=()
+for f in "${COMPOSE_FILES[@]}"; do
+  COMPOSE_ARGS+=(-f "$f")
+done
+"$PODMAN_BIN" compose "${COMPOSE_ARGS[@]}" up -d --remove-orphans
 
 # Show containers
 echo

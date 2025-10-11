@@ -1,3 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Backward-compatible wrapper: if the image contains /usr/local/bin/entrypoint.sh use it,
+# otherwise perform the export inline and then exec the provided command (or a sensible default).
+if [[ -x "/usr/local/bin/entrypoint.sh" ]]; then
+  exec "/usr/local/bin/entrypoint.sh" "$@"
+fi
+
+# Fallback export logic (same behaviour as entrypoint.sh)
+if command -v compgen >/dev/null 2>&1; then
+  file_vars=$(compgen -e | grep '_API_KEY_FILE$' || true)
+else
+  file_vars=$(env | awk -F= '/_API_KEY_FILE$/{print $1}' || true)
+fi
+
+for file_var in $file_vars; do
+  key_var="${file_var%_FILE}"
+  file_path="${!file_var:-}"
+  if [[ -n "$file_path" && -f "$file_path" ]]; then
+    export "$key_var"="$(cat "$file_path")"
+  else
+    echo "Warning: secret file for $key_var not found at ${file_path:-'<unset>'}" >&2
+  fi
+done
+
+# If a command was provided, run it; otherwise fall back to the default Node start used in compose
+if [[ $# -gt 0 ]]; then
+  exec "$@"
+else
+  exec node dist/src/app/index.cjs --mode api --port 3000 --host 0.0.0.0 --agent /app/memAgent/cipher.yml --mcp-transport-type sse
+fi
 #!/bin/sh
 
 # Load Podman secrets and start Cipher
