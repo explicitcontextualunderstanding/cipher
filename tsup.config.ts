@@ -7,6 +7,12 @@ export default defineConfig([
 		dts: true,
 		shims: true,
 		bundle: true,
+		esbuildOptions(options) {
+			// Ensure esbuild can resolve .js import specifiers
+			// against TypeScript source files in a NodeNext
+			// ESM project.
+			options.resolveExtensions = ['.ts', '.tsx', '.js', '.jsx', '.json'];
+		},
 		noExternal: ['chalk', 'boxen'],
 		external: ['better-sqlite3', 'pg', 'redis'],
 	},
@@ -16,6 +22,9 @@ export default defineConfig([
 		outDir: 'dist/src/app',
 		shims: true,
 		bundle: true,
+		esbuildOptions(options) {
+			options.resolveExtensions = ['.ts', '.tsx', '.js', '.jsx', '.json'];
+		},
 		platform: 'node',
 		target: 'node18', // Specify Node.js target version
 		external: [
