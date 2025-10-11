@@ -10,13 +10,14 @@ services:
       - CIPHER_API_PREFIX=""
       - CIPHER_LOG_LEVEL=debug
       - MCP_SERVER_MODE=aggregator
+      - MCP_TRANSPORT_TYPE=sse
       - GEMINI_API_KEY_FILE=/run/secrets/cipher-gemini-api-key
       - ANTHROPIC_API_KEY_FILE=/run/secrets/cipher-zai-api-key
     env_file:
       - .env
     command:
       [
-        '/tmp/load-secret.sh'
+        'sh', '-c', 'node dist/src/app/index.cjs --mode api --port $$PORT --host 0.0.0.0 --agent $$CONFIG_FILE --mcp-transport-type $$MCP_TRANSPORT_TYPE'
       ]
     volumes:
       - ./memAgent:/app/memAgent:ro

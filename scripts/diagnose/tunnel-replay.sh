@@ -10,7 +10,7 @@
 # Usage:
 #   scripts/diagnose/tunnel-replay.sh [--no-reload] [--alt-port PORT] [--foreground] <user@jetson-host>
 # Examples:
-#   scripts/diagnose/tunnel-replay.sh amazon1148@192.168.1.117
+#   scripts/diagnose/tunnel-replay.sh amazon1148@192.168.1.86
 #   scripts/diagnose/tunnel-replay.sh --alt-port 3002 --no-reload amazon1148@jetson
 #
 set -euo pipefail

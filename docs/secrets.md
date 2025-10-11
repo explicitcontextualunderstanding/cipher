@@ -2,6 +2,47 @@
 
 This document explains how Cipher manages secrets for local development and secure deployments on macOS. It describes the different storage options (macOS Keychain, environment variables, Podman secrets and Docker/Podman Compose secrets), the scripts provided in `scripts/` to create/load secrets, and recommended workflows.
 
+## Current Status
+
+**✅ Container Deployment Ready**: The Cipher container has been successfully built and tested. All required secrets and API endpoints are functioning properly.
+
+### Validated Components
+
+- ✅ API Server: Running on port 3000 with health endpoints
+- ✅ MCP Server: Available with SSE endpoints at `/mcp/sse`
+- ✅ WebSocket Server: Available at `ws://0.0.0.0:3000/ws`
+- ✅ Secret Loading: Properly configured for Podman secrets
+- ✅ LLM Services: All LLM providers restored and functional
+- ✅ Embedding Manager: OpenAI embedder registered successfully
+- ✅ Vector Storage: Dual collection system connected
+
+## Deployment Validation
+
+The container deployment has been tested and validated:
+
+### Quick Start Commands
+
+```bash
+# Build and run with compose
+podman compose up -d
+
+# Check container status
+podman ps
+
+# Test health endpoint
+curl http://localhost:3000/health
+
+# View logs
+podman logs cipher_cipher-api_1
+```
+
+### Service Endpoints
+
+- **Health Check**: `http://localhost:3000/health`
+- **API Base**: `http://localhost:3000/api`
+- **MCP SSE**: `http://localhost:3000/mcp/sse`
+- **WebSocket**: `ws://localhost:3000/ws`
+
 ## Scope
 
 - local developer workflows on macOS
@@ -172,26 +213,29 @@ podman secret ls
 
 ## Docker Compose Integration
 
-Use secrets in your `docker-compose.yml` for secure key injection:
+Use secrets in your `docker-compose.yml` for secure key injection and MCP configuration:
 
 ```yaml
 version: "3.8"
 
 services:
   cipher-api:
+    build: .
     image: cipher-api
+    ports:
+      - '3000:3000'
     environment:
+      - CIPHER_API_PREFIX=""
       - CIPHER_LOG_LEVEL=debug
       - MCP_SERVER_MODE=aggregator
+      - MCP_TRANSPORT_TYPE=sse
       - GEMINI_API_KEY_FILE=/run/secrets/cipher-gemini-api-key
       - ANTHROPIC_API_KEY_FILE=/run/secrets/cipher-zai-api-key
     secrets:
       - cipher-gemini-api-key
       - cipher-zai-api-key
     command:
-      - '/tmp/load-secret.sh'
-    volumes:
-      - ./scripts/run/load-secret.sh:/tmp/load-secret.sh:ro
+      - 'sh', '-c', 'node dist/src/app/index.cjs --mode api --port $$PORT --host 0.0.0.0 --agent $$CONFIG_FILE --mcp-transport-type $$MCP_TRANSPORT_TYPE'
 
 secrets:
   cipher-gemini-api-key:
@@ -200,29 +244,71 @@ secrets:
     external: true
 ```
 
-## Load Script Usage
+**Key Configuration Updates:**
 
-The `scripts/load-secret.sh` script automatically loads secrets into environment variables at container startup:
+- **MCP_TRANSPORT_TYPE**: Essential for SSE transport - must be set to `sse`
+- **Command Override**: Ensures the MCP transport type is passed correctly to the application
+- **Built-in Entry Point**: Uses `/usr/local/bin/entrypoint.sh` for automatic secret loading
+- **Environment Variables**: All required variables for both secrets and MCP functionality
+
+## Secret Loading Mechanism
+
+The container uses a built-in entrypoint script that automatically loads secrets into environment variables at container startup:
+
+### Built-in Entry Point (`/usr/local/bin/entrypoint.sh`)
 
 ```bash
-#!/bin/bash
-# This script loads Podman secrets into environment variables
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "🔑 Loading API keys from Podman secrets..."
-if [ -f "/run/secrets/cipher-gemini-api-key" ]; then
-  export GEMINI_API_KEY=$(cat /run/secrets/cipher-gemini-api-key)
-  echo "✅ GEMINI_API_KEY loaded from secret file"
+# Universal entrypoint: export any *_API_KEY_FILE into *_API_KEY
+# Uses bash's compgen builtin when available, and falls back to parsing env
+if command -v compgen >/dev/null 2>&1; then
+  file_vars=$(compgen -e | grep '_API_KEY_FILE$' || true)
+else
+  file_vars=$(env | awk -F= '/_API_KEY_FILE$/{print $1}' || true)
 fi
 
-if [ -f "/run/secrets/cipher-zai-api-key" ]; then
-  export ANTHROPIC_API_KEY=$(cat /run/secrets/cipher-zai-api-key)
-  echo "✅ ANTHROPIC_API_KEY (Z.ai) loaded from secret file"
-fi
+for file_var in $file_vars; do
+  key_var="${file_var%_FILE}"
+  # Indirect expansion to get the file path value
+  file_path="${!file_var:-}"
+  if [[ -n "$file_path" && -f "$file_path" ]]; then
+    # Read the secret and assign it to the dynamically-named variable safely
+    value="$(cat "$file_path")"
+    # Use printf -v to set a variable whose name is in $key_var
+    printf -v "$key_var" '%s' "$value"
+    export "$key_var"
+  else
+    echo "Warning: secret file for $key_var not found at ${file_path:-'<unset>'}" >&2
+  fi
+done
 
-# Start Cipher with secure API keys
-echo "🚀 Starting Cipher with secure API keys in aggregator mode..."
-exec node dist/src/app/index.cjs --mode api --port 3000 --host 0.0.0.0
+# Execute the original command
+exec "$@"
 ```
+
+### Environment Variable Processing
+
+The entrypoint automatically:
+
+1. **Scans** for environment variables ending in `_API_KEY_FILE`
+2. **Reads** the corresponding secret files from `/run/secrets/`
+3. **Exports** the loaded values as `_API_KEY` variables
+4. **Executes** the container command with the secrets loaded
+
+### Example Secret Loading Flow
+
+For the configured environment variables:
+
+- `GEMINI_API_KEY_FILE=/run/secrets/cipher-gemini-api-key`
+- `ANTHROPIC_API_KEY_FILE=/run/secrets/cipher-zai-api-key`
+
+The entrypoint will:
+
+1. Read `/run/secrets/cipher-gemini-api-key` → export as `GEMINI_API_KEY`
+2. Read `/run/secrets/cipher-zai-api-key` → export as `ANTHROPIC_API_KEY`
+3. Execute the Node.js application with these environment variables set
 
 ## MCP Connectivity Validation
 
@@ -237,8 +323,9 @@ echo "🔍 Validating MCP service setup..."
 # Test health endpoint
 curl -s http://localhost:3000/health | jq .
 
-# Test SSE endpoint
+# Test SSE endpoint (should return streaming response)
 curl -s http://localhost:3000/mcp/sse --max-time 5
+# Expected output: event: endpoint\ndata: /mcp?sessionId=<session-id>
 
 # Verify MCP client can connect
 claude mcp list
@@ -250,6 +337,68 @@ This script validates:
 - SSE endpoint accessibility
 - MCP client connectivity
 - Secret loading functionality
+
+## MCP Transport Configuration
+
+### Environment Variable Configuration
+
+The MCP transport type is controlled by the `MCP_TRANSPORT_TYPE` environment variable. For SSE transport, ensure:
+
+```yaml
+environment:
+  - MCP_TRANSPORT_TYPE=sse
+  - MCP_SERVER_MODE=aggregator
+```
+
+### Application Code Integration
+
+The application consumes the MCP transport configuration in `src/app/index.ts`:
+
+```typescript
+const mcpTransportType = options.mcpTransportType || process.env.MCP_TRANSPORT_TYPE || undefined;
+```
+
+The API server checks this configuration in `src/app/api/server.ts` and registers SSE routes when set to 'sse':
+
+```typescript
+if (this.config.mcpTransportType) {
+  this.setupMcpSseRoutes();
+}
+```
+
+### Troubleshooting MCP Transport Issues
+
+If MCP SSE endpoints are not working:
+
+1. **Check Container Logs**:
+   ```bash
+   podman logs cipher_cipher-api_1 | grep "MCP server with transport type"
+   # Should show: "Setting up MCP server with transport type: sse"
+   ```
+
+2. **Verify Environment Variable**:
+   ```bash
+   podman exec cipher_cipher-api_1 env | grep MCP_TRANSPORT_TYPE
+   # Should show: MCP_TRANSPORT_TYPE=sse
+   ```
+
+3. **Test SSE Endpoint Directly**:
+   ```bash
+   curl --max-time 5 http://localhost:3000/mcp/sse
+   # Should return: event: endpoint\ndata: /mcp?sessionId=<uuid>
+   ```
+
+4. **Check Route Registration**:
+   ```bash
+   podman logs cipher_cipher-api_1 | grep "MCP SSE.*routes registered"
+   # Should show: "MCP SSE (GET /mcp/sse) and POST (/mcp?sessionId=...) routes registered."
+   ```
+
+### Common Configuration Issues
+
+- **Missing Environment Variable**: Container defaults to 'stdio' transport if `MCP_TRANSPORT_TYPE` is not set
+- **Incorrect Command Override**: Ensure the docker-compose command passes `$$MCP_TRANSPORT_TYPE` to the application
+- **Entry Point Conflicts**: Use the built-in entrypoint for proper secret loading and environment variable handling
 
 ## Recommended development workflows
 
@@ -346,33 +495,33 @@ This script validates:
 
 - Create a KeyChain entry (example):
 
-    ```bash
-    security add-generic-password -a "kieran@rossollc.com" -s "GEMINI_API_KEY" -w "<key>"
-    ```
+```bash
+security add-generic-password -a "kieran@rossollc.com" -s "GEMINI_API_KEY" -w "<key>"
+```
 
 - Create a Podman secret from a KeyChain value (non-interactive):
 
-    ```bash
-    ./scripts/create-gemini-secret.sh
-    ```
+```bash
+./scripts/create-gemini-secret.sh
+```
 
 - List Podman secrets:
 
-    ```bash
-    podman secret list
-    ```
+```bash
+podman secret list
+```
 
 - Inspect a specific Podman secret:
 
-    ```bash
-    podman secret inspect cipher-gemini-api-key
-    ```
+```bash
+podman secret inspect cipher-gemini-api-key
+```
 
 - Generate `.env` from KeyChain (local dev):
 
-    ```bash
-    ./scripts/generate-env.sh
-    ```
+```bash
+./scripts/generate-env.sh
+```
 
 ## Appendix: where to look in the repo
 

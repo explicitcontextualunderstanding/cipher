@@ -29,6 +29,8 @@ RUN pnpm install --frozen-lockfile
 
 # Copy source and build
 COPY . .
+# Set Node.js memory limit for build process to prevent OOM
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 # Use conditional build based on BUILD_UI arg
 RUN if [ "$BUILD_UI" = "true" ]; then pnpm run build; else pnpm run build:no-ui; fi
 

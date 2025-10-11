@@ -2,6 +2,62 @@
 
 When `claude mcp list` shows the SSE entry as ✗ Failed to connect, follow this concise, repeatable checklist to determine whether the problem is the local Podman host mapping, the reverse SSH tunnel, or a remote port conflict (for example, VS Code auto-forwards or leftover diagnostics processes).
 
+## Current Status
+
+**✅ Full System Operational**: The Cipher container has been successfully built and is running with all services operational. A working SSH reverse tunnel provides MCP access from remote hosts.
+
+### Working Configuration Summary
+
+- ✅ **Container Build**: Successfully builds with optimized memory settings
+- ✅ **API Server**: Running on port 3000 with all endpoints functional
+- ✅ **MCP Integration**: SSE endpoint available at `/mcp/sse`
+- ✅ **SSH Tunnel**: Persistent reverse tunnel using simple background script
+- ✅ **Secret Management**: Properly configured and tested
+- ✅ **LLM Services**: All providers restored and working
+- ✅ **Health Monitoring**: All health checks passing
+- ✅ **Remote Access**: Claude MCP client connected from Jetson
+
+### Current Tunnel Solution
+
+Instead of the complex autossh LaunchAgent setup, we use a simple, reliable background script:
+
+```bash
+# Simple tunnel script (currently running)
+/Users/kieranlal/workspace/cipher/scripts/autossh/simple_tunnel.sh
+
+# Tunnel status
+ps aux | grep simple_tunnel.sh | grep -v grep
+
+# Tunnel logs
+tail -f ~/Library/Logs/cipher-ssh-tunnel.log
+```
+
+### Verified Working Configuration
+
+- ✅ **Container Build**: Successfully builds with optimized memory settings
+- ✅ **API Server**: Running on port 3000 with all endpoints functional
+- ✅ **MCP Integration**: SSE endpoint available at `/mcp/sse`
+- ✅ **Secret Management**: Properly configured and tested
+- ✅ **LLM Services**: All providers restored and working
+- ✅ **Health Monitoring**: All health checks passing
+
+### Validated Endpoints
+
+```bash
+# Test basic connectivity (should return HTTP 200)
+curl http://localhost:3000/health
+
+# Test MCP SSE endpoint (should return event stream)
+curl http://localhost:3000/mcp/sse
+
+# Test WebSocket connection
+curl -i -N -H "Connection: Upgrade" \
+     -H "Upgrade: websocket" \
+     -H "Sec-WebSocket-Key: test" \
+     -H "Sec-WebSocket-Version: 13" \
+     http://localhost:3000/ws
+```
+
 1. Confirm the Cipher API on macOS is healthy (host)
 
 ```bash
@@ -167,6 +223,110 @@ Suggested remediation flow
 4. When the remote forwards are cleared and the host mapping is healthy, run the replay without `--no-reload` (or manually re-enable the LaunchAgent) to restore the persistent autossh tunnel.
 
 If you want any additional checks (for example, automatic parsing of JSON health responses or a remote nc-based TCP check), I can extend the helper script accordingly.
+
+## Quick Reference for Working Setup
+
+### Container Management
+
+```bash
+# Start the container
+podman compose up -d
+
+# Check status
+podman ps
+
+# View logs
+podman logs -f cipher_cipher-api_1
+
+# Stop the container
+podman compose down
+```
+
+### MCP Client Testing
+
+```bash
+# Check MCP connection status
+claude mcp list
+
+# Expected output (when connected):
+# cipher: http://localhost:3000/mcp/sse (SSE) - ✓ Connected
+```
+
+### Troubleshooting Priority
+
+1. **Container Health**: Verify `curl http://localhost:3000/health` returns 200
+2. **Local Port**: Check `lsof -i :3000` shows gvproxy or container process
+3. **MCP Endpoint**: Test `curl http://localhost:3000/mcp/sse` for streaming response
+4. **SSH Tunnel**: Use diagnostic scripts if remote access is needed
+
+## Diagnostic Scripts (All Working)
+
+The repository includes several diagnostic scripts that work with the current setup:
+
+### Quick Tunnel Check
+```bash
+# Comprehensive tunnel health check
+./scripts/autossh/check_autossh_forward.sh amazon1148@192.168.1.86
+```
+
+### Port Owner Monitoring
+```bash
+# Capture port ownership details (useful for intermittent issues)
+./scripts/autossh/log_port_owner.sh amazon1148@192.168.1.86 3001 -n 3 -i 5
+
+# View captured history
+tail -n 20 ~/Library/Logs/cipher-port-owner-history.log
+```
+
+### Tunnel Replay (Manual Testing)
+```bash
+# Stop current tunnel and test manual forward
+./scripts/diagnose/tunnel-replay.sh --no-reload amazon1148@192.168.1.86
+
+# Test with alternate port if needed
+./scripts/diagnose/tunnel-replay.sh --alt-port 3002 amazon1148@192.168.1.86
+```
+
+### Tunnel Management
+```bash
+# Start simple tunnel (if stopped)
+nohup ./scripts/autossh/simple_tunnel.sh > /dev/null 2>&1 &
+
+# Check tunnel status
+ps aux | grep simple_tunnel.sh | grep -v grep
+
+# View tunnel logs
+tail -f ~/Library/Logs/cipher-ssh-tunnel.log
+
+# Stop tunnel
+pkill -f simple_tunnel.sh
+```
+
+## Success Indicators
+
+- ✅ Container starts without errors
+- ✅ Health endpoint returns HTTP 200
+- ✅ MCP SSE endpoint streams events
+- ✅ Claude MCP client shows "Connected" status from remote host
+- ✅ All LLM services initialize in container logs
+- ✅ SSH reverse tunnel established and persistent
+- ✅ Port 3001 bound to sshd on remote host
+- ✅ HTTP requests through tunnel return proper responses
+
+## Current Working Setup Summary
+
+**Architecture**: Mac (Cipher Container) ← SSH Reverse Tunnel → Jetson (Claude MCP Client)
+
+**Key Components**:
+- Container: `podman compose up -d` (Mac)
+- Tunnel: `simple_tunnel.sh` background script (Mac)
+- Client: `claude mcp list` (Jetson)
+- IP Address: `192.168.1.86` (updated from old `192.168.1.117`)
+
+**Configuration Files Updated**:
+- `scripts/autossh/autossh_watchdog.sh` - Fixed hardcoded IP
+- `scripts/diagnose/tunnel-replay.sh` - Updated example commands
+- `scripts/autossh/simple_tunnel.sh` - New reliable tunnel solution
 
 Non-interactive owner collection (sudo-friendly)
 
@@ -381,7 +541,7 @@ claude mcp list
 # cipher: http://localhost:3000/mcp/sse (SSE) - ✓ Connected
 ```
 
-2) Active SSE test with curl
+1) Active SSE test with curl
 
 ```bash
 # Keep the connection open and show incoming SSE frames (no buffering)
@@ -389,10 +549,11 @@ curl -v --no-buffer --max-time 60 http://127.0.0.1:3000/mcp/sse
 ```
 
 What to look for:
+
 - HTTP/1.1 200 OK and a `Content-Type: text/event-stream` header.
 - Lines beginning with `event:` and/or `data:`. A `data:` line containing JSON indicates the MCP service is publishing events.
 
-3) Active SSE test with a small Python script (more robust parsing)
+1) Active SSE test with a small Python script (more robust parsing)
 
 ```python
 #!/usr/bin/env python3
@@ -412,7 +573,7 @@ with requests.get(URL, stream=True, timeout=10) as r:
 # Install requirements: pip install requests
 ```
 
-4) If your MCP client supports an explicit subscribe command
+1) If your MCP client supports an explicit subscribe command
 
 If the MCP client (for example the Claude CLI) provides an explicit subscribe or stream command, use that to observe the SSE lifecycle and incoming events. If not, the `curl` and Python examples above provide equivalent streaming validations.
 

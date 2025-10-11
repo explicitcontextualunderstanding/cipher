@@ -11,7 +11,7 @@ UIDSTR=$(id -u)
 
 # Allow plist to provide these; otherwise fall back to sensible defaults
 : ${CIPHER_AUTOSSH_USER:=amazon1148}
-: ${CIPHER_AUTOSSH_HOST:=192.168.1.117}
+: ${CIPHER_AUTOSSH_HOST:=192.168.1.86}
 : ${CIPHER_AUTOSSH_REMOTE_PORT:=3001}
 
 mkdir -p "$(dirname "$WATCHDOG_LOG")"

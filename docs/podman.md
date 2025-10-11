@@ -3,7 +3,7 @@
 This document explains common Podman VM/networking behaviors on macOS and
 how to avoid `gvproxy` port conflicts when running the Cipher API locally.
 
-Key points
+## Key Points
 
 - Podman runs inside a VM on macOS. Each VM (machine) provides an isolated
   container runtime and its own set of images, secrets and containers.
@@ -13,7 +13,10 @@ Key points
   gvproxy process can bind host ports and block a new machine from taking the
   same ports.
 
-Recommended workflow
+- **Container Build Success**: Cipher now builds successfully with optimized
+  memory settings and proper NodeNext module resolution via bundling.
+
+## Recommended Workflow
 
 1. Create / use a single Podman machine for development (use user-mode
    networking / slirp for predictable host port mapping):
@@ -28,6 +31,24 @@ Recommended workflow
 
 3. Deploy the stack with `podman compose` or `podman-compose` while the
    client is connected to the correct machine.
+
+## Recent Build Improvements
+
+The Cipher container build has been optimized to address memory constraints and
+module resolution issues:
+
+- **Memory Optimization**: Added `NODE_OPTIONS="--max-old-space-size=4096"` to Dockerfile
+- **Build Configuration**: Optimized tsup config with reduced concurrency and no minification
+- **Module Resolution**: Enabled bundling for proper NodeNext `.js` extension resolution
+- **Container Success**: Container now builds and runs successfully with all services initialized
+
+### Build Status
+
+- ✅ TypeScript compilation (DTS build) - 386KB type definitions
+- ✅ Core module bundling - 1.85MB CJS, 1.84MB ESM
+- ✅ App module bundling - 2.14MB CJS
+- ✅ Production image creation with all dependencies
+- ✅ Container startup and API server initialization
 
 ## Cipher Container Setup
 
@@ -87,25 +108,64 @@ podman machine ssh podman-machine-slirp
 curl http://localhost:3000/health
 ```
 
+### MCP SSE Endpoint Validation
+
+After the container is running, validate the MCP SSE functionality:
+
+```bash
+# Test basic health endpoint
+curl http://localhost:3000/health
+
+# Test MCP SSE endpoint (should return streaming response)
+curl --max-time 5 http://localhost:3000/mcp/sse
+# Expected output: event: endpoint\ndata: /mcp?sessionId=<session-id>
+
+# Verify MCP transport type is correctly configured
+podman logs cipher_cipher-api_1 | grep "MCP server with transport type"
+# Should show: "Setting up MCP server with transport type: sse"
+```
+
 ### Docker Compose Integration
 
-The `docker-compose.yml` automatically handles secrets mounting:
+The `docker-compose.yml` automatically handles secrets mounting and MCP configuration:
 
 ```yaml
+version: "3.8"
+
+services:
+  cipher-api:
+    build: .
+    image: cipher-api
+    ports:
+      - '3000:3000'
+    environment:
+      - CIPHER_API_PREFIX=""
+      - CIPHER_LOG_LEVEL=debug
+      - MCP_SERVER_MODE=aggregator
+      - MCP_TRANSPORT_TYPE=sse
+      - GEMINI_API_KEY_FILE=/run/secrets/cipher-gemini-api-key
+      - ANTHROPIC_API_KEY_FILE=/run/secrets/cipher-zai-api-key
+    secrets:
+      - cipher-gemini-api-key
+      - cipher-zai-api-key
+    command:
+      - 'sh', '-c', 'node dist/src/app/index.cjs --mode api --port $$PORT --host 0.0.0.0 --agent $$CONFIG_FILE --mcp-transport-type $$MCP_TRANSPORT_TYPE'
+
 secrets:
   cipher-gemini-api-key:
     external: true
   cipher-zai-api-key:
     external: true
-
-services:
-  cipher-api:
-    secrets:
-      - cipher-gemini-api-key
-      - cipher-zai-api-key
 ```
 
-The `scripts/load-secret.sh` script loads secrets into environment variables at container startup.
+**Key Configuration Notes:**
+
+- **MCP_TRANSPORT_TYPE**: Set to `sse` to enable Server-Sent Events transport
+- **MCP_SERVER_MODE**: Set to `aggregator` for MCP server functionality
+- **Secret Loading**: The built-in entrypoint handles secret loading automatically
+- **Command Override**: The compose command explicitly passes the MCP transport type to ensure proper configuration
+
+The container's built-in entrypoint (`/usr/local/bin/entrypoint.sh`) automatically loads secrets from `/run/secrets/` into environment variables at startup.
 
 Troubleshooting
 

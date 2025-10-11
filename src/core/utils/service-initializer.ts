@@ -1,5 +1,5 @@
 import { EnhancedPromptManager } from '../brain/systemPrompt/enhanced-manager.js';
-import { ContextManager } from '../brain/llm/index';
+import { ContextManager } from '../brain/llm/index.js';
 import { MemAgentStateManager } from '../brain/memAgent/state-manager.js';
 import { MCPManager } from '../mcp/manager.js';
 import { SessionManager } from '../session/session-manager.js';
@@ -12,9 +12,9 @@ import { ServerConfigsSchema } from '../mcp/config.js';
 import { ServerConfigs } from '../mcp/types.js';
 import { EmbeddingManager } from '../brain/embedding/index.js';
 import { VectorStoreManager, DualCollectionVectorManager } from '../vector_storage/index.js';
-import { createLLMService } from '../brain/llm/services/factory';
+import { createLLMService } from '../brain/llm/services/factory.js';
 import { createContextManager } from '../brain/llm/messages/factory.js';
-import { ILLMService } from '../brain/llm/index';
+import { ILLMService } from '../brain/llm/index.js';
 import { getServiceCache, createServiceKey } from '../brain/memory/service-cache.js';
 import {
 	createVectorStoreFromEnv,
