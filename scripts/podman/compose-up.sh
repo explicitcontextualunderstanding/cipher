@@ -112,7 +112,11 @@ COMPOSE_ARGS=()
 for f in "${COMPOSE_FILES[@]}"; do
   COMPOSE_ARGS+=(-f "$f")
 done
-"$PODMAN_BIN" compose "${COMPOSE_ARGS[@]}" up -d --remove-orphans
+if [ "$DO_BUILD" = true ]; then
+  "$PODMAN_BIN" compose "${COMPOSE_ARGS[@]}" up -d --remove-orphans --force-recreate
+else
+  "$PODMAN_BIN" compose "${COMPOSE_ARGS[@]}" up -d --remove-orphans
+fi
 
 # Show containers
 echo
