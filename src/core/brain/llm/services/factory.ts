@@ -15,6 +15,7 @@ import { AzureService } from './azure.js';
 import { GeminiService } from './gemini.js';
 import { LMStudioService } from './lmstudio.js';
 import { DeepseekService } from './deepseek.js';
+import { LLMServices, ExtendedLLMConfig } from './service.js';
 
 function extractApiKey(config: LLMConfig): string {
     const provider = config.provider.toLowerCase();
