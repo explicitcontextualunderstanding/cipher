@@ -50,8 +50,9 @@ RUN addgroup -g 1001 -S cipher && adduser -S cipher -u 1001
 RUN mkdir -p /app/.cipher/database && \
     chown -R cipher:cipher /app/.cipher
 
-# Install Chrome for Puppeteer web search functionality
+# Install bash and Chrome for Puppeteer web search functionality
 RUN apk add --no-cache \
+    bash \
     chromium \
     nss \
     freetype \

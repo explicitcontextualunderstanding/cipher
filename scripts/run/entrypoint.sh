@@ -14,7 +14,11 @@ for file_var in $file_vars; do
   # Indirect expansion to get the file path value
   file_path="${!file_var:-}"
   if [[ -n "$file_path" && -f "$file_path" ]]; then
-    export "$key_var"="$(cat "$file_path")"
+    # Read the secret and assign it to the dynamically-named variable safely
+    value="$(cat "$file_path")"
+    # Use printf -v to set a variable whose name is in $key_var
+    printf -v "$key_var" '%s' "$value"
+    export "$key_var"
   else
     echo "Warning: secret file for $key_var not found at ${file_path:-'<unset>'}" >&2
   fi

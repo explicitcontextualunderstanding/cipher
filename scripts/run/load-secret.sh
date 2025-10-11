@@ -18,7 +18,9 @@ for file_var in $file_vars; do
   key_var="${file_var%_FILE}"
   file_path="${!file_var:-}"
   if [[ -n "$file_path" && -f "$file_path" ]]; then
-    export "$key_var"="$(cat "$file_path")"
+    value="$(cat "$file_path")"
+    printf -v "$key_var" '%s' "$value"
+    export "$key_var"
   else
     echo "Warning: secret file for $key_var not found at ${file_path:-'<unset>'}" >&2
   fi
