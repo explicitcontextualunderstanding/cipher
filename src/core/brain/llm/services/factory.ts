@@ -21,74 +21,11 @@ function extractApiKey(config: LLMConfig): string {
 
     // These providers don't require traditional API keys
     if (
-        provider === 'ollama' ||
-        provider === 'lmstudio' ||
-        provider === 'aws' ||
-        provider === 'azure'
-    ) {
-        return 'not-required';
+    if (provider === 'deepseek') {
+        return 'https://api.deepseek.com';
     }
 
-    // Get API key from config (already expanded)
-    let apiKey = config.apiKey || '';
-
-    if (!apiKey) {
-        const errorMsg = `Error: API key for ${provider} not found`;
-        logger.error(errorMsg);
-        logger.error(`Please set your ${provider} API key in the config file or .env file`);
-        throw new Error(errorMsg);
-    }
-    logger.debug('Verified API key');
-    return apiKey;
-}
-
-function getOpenAICompatibleBaseURL(llmConfig: LLMConfig): string {
-    if (llmConfig.baseURL) {
-        let baseUrl = llmConfig.baseURL.replace(/\/$/, '');
-
-        // For Ollama, ensure /v1 suffix for OpenAI-compatible endpoint
-        const provider = llmConfig.provider.toLowerCase();
-        if (provider === 'ollama' && !baseUrl.endsWith('/v1') && !baseUrl.endsWith('/api')) {
-            baseUrl = baseUrl + '/v1';
-        }
-
-        return baseUrl;
-    }
-
-    // Provider-specific defaults and environment fallbacks
-    const provider = llmConfig.provider.toLowerCase();
-
-    if (provider === 'openrouter') {
-        return 'https://openrouter.ai/api/v1';
-    }
-
-    if (provider === 'ollama') {
-        // Use environment variable if set, otherwise default to localhost:11434/v1
-        let baseUrl = env.OLLAMA_BASE_URL || 'http://localhost:11434/v1';
-
-        // Ensure /v1 suffix for OpenAI-compatible endpoint
-        if (!baseUrl.endsWith('/v1') && !baseUrl.endsWith('/api')) {
-            baseUrl = baseUrl.replace(/\/$/, '') + '/v1';
-        }
-
-        return baseUrl;
-    }
-
-    if (provider === 'lmstudio') {
-        // Use environment variable if set, otherwise default to localhost:1234/v1
-        return env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1';
-    }
-
-    if (provider === 'qwen') {
-        return llmConfig.baseURL || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-    }
-
-	// TODO: Consider if this is necessary
-	if (provider === 'deepseek') {
-		return 'https://api.deepseek.com';
-	}
-
-	return '';
+    return '';
 }
 
 function _createLLMService(
@@ -98,68 +35,61 @@ function _createLLMService(
     unifiedToolManager?: UnifiedToolManager,
     eventManager?: EventManager
 ): ILLMService {
-    // Extract and validate API key
+    // Validate API key (or allow providers that don't require them)
     const apiKey = extractApiKey(config);
     const baseURL = getOpenAICompatibleBaseURL(config);
-    const providerType = mapProviderToUnifiedType(config.provider);
 
-    // Create unified configuration
+    // Build a unified config that the generic LLMServices wrapper
+    // can consume. This keeps provider-specific wiring inside the
+    // LLMServices implementation and avoids fragile switch logic
+    // in the factory.
     const unifiedConfig: ExtendedLLMConfig = {
-        provider: providerType,
+        provider: (config.provider || '').toLowerCase() as any,
         model: config.model,
         apiKey: apiKey !== 'not-required' ? apiKey : undefined,
         baseURL: baseURL || undefined,
         maxIterations: config.maxIterations,
-        streaming: false, // Can be made configurable
+        streaming: false,
+        awsConfig: (config as any).aws,
+        region: (config as any).aws?.region || process.env.AWS_DEFAULT_REGION,
+        endpoint: (config as any).azure?.endpoint || process.env.AZURE_OPENAI_ENDPOINT,
+        deployment: (config as any).azure?.deployment,
+        apiVersion: (config as any).azure?.apiVersion,
+        resourceName: (config as any).azure?.resourceName,
+        enableThinking: (config as any).qwenOptions?.enableThinking,
+        thinkingBudget: (config as any).qwenOptions?.thinkingBudget,
     };
 
-    // Add provider-specific configurations
-    switch (providerType) {
-        case 'aws':
-            unifiedConfig.region = config.aws?.region || process.env.AWS_DEFAULT_REGION || 'us-east-1';
-            unifiedConfig.awsConfig = config.aws;
-            unifiedConfig.inferenceProfileArn = config.aws?.inferenceProfileArn;
-            break;
+    // Defer to the generic LLMServices implementation which knows
+    // how to initialize provider-specific clients.
+    return new LLMServices(unifiedConfig, mcpManager, contextManager, unifiedToolManager, eventManager);
+}
 
-        case 'azure':
-            unifiedConfig.endpoint = config.azure?.endpoint || process.env.AZURE_OPENAI_ENDPOINT;
-            unifiedConfig.deployment = config.azure?.deployment;
-            unifiedConfig.apiVersion = config.azure?.apiVersion;
-            unifiedConfig.resourceName = config.azure?.resourceName;
-            break;
+export function createLLMService(
+    config: LLMConfig,
+    mcpManager: MCPManager,
+    contextManager: ContextManager,
+    unifiedToolManager?: UnifiedToolManager,
+    eventManager?: EventManager
+): ILLMService {
+    logger.info(`Creating LLM service for provider: ${config.provider}`, {
+        model: config.model,
+        hasUnifiedToolManager: !!unifiedToolManager,
+        hasEventManager: !!eventManager,
+    });
 
-        case 'qwen':
-            unifiedConfig.enableThinking = config.qwenOptions?.enableThinking;
-            unifiedConfig.thinkingBudget = config.qwenOptions?.thinkingBudget;
-            break;
+    const service = _createLLMService(config, mcpManager, contextManager, unifiedToolManager, eventManager);
 
-        case 'openrouter':
-            unifiedConfig.baseURL = 'https://openrouter.ai/api/v1';
-            break;
+    // Configure token-aware compression for the context manager
+    configureCompressionForService(config, contextManager);
 
-        case 'ollama':
-        case 'lmstudio':
-        case 'vllm':
-            // baseURL already set above
-            break;
-    }
+    logger.info(`Successfully created unified LLM service for ${config.provider}`, {
+        model: config.model,
+        provider: config.provider,
+    });
 
-			const OpenAIClass = require('openai');
-			const openai = new OpenAIClass({ apiKey, baseURL });
-			const qwenOptions: QwenOptions = {
-				...(config.qwenOptions?.enableThinking !== undefined && {
-					enableThinking: config.qwenOptions.enableThinking,
-				}),
-				...(config.qwenOptions?.thinkingBudget !== undefined && {
-					thinkingBudget: config.qwenOptions.thinkingBudget,
-				}),
-				...(config.qwenOptions?.temperature !== undefined && {
-					temperature: config.qwenOptions.temperature,
-				}),
-				...(config.qwenOptions?.top_p !== undefined && { top_p: config.qwenOptions.top_p }),
-			};
-			return new QwenService(
-				openai,
+    return service;
+}
 				config.model,
 				mcpManager,
 				contextManager,
