@@ -128,20 +128,47 @@ function _createLLMService(
             unifiedConfig.resourceName = config.azure?.resourceName;
             break;
 
-        case 'qwen':
+        case 'qwen': {
             unifiedConfig.enableThinking = config.qwenOptions?.enableThinking;
             unifiedConfig.thinkingBudget = config.qwenOptions?.thinkingBudget;
-            break;
+            const OpenAIClass = require('openai');
+            const openai = new OpenAIClass({ apiKey, baseURL });
+            const qwenOptions: QwenOptions = {
+                ...(config.qwenOptions?.enableThinking !== undefined && { enableThinking: config.qwenOptions.enableThinking }),
+                ...(config.qwenOptions?.thinkingBudget !== undefined && { thinkingBudget: config.qwenOptions.thinkingBudget }),
+                ...(config.qwenOptions?.temperature !== undefined && { temperature: config.qwenOptions.temperature }),
+                ...(config.qwenOptions?.top_p !== undefined && { top_p: config.qwenOptions.top_p }),
+            };
+            return new QwenService(openai, config.model, mcpManager, contextManager, config.maxIterations, qwenOptions, unifiedToolManager);
+        }
 
         case 'openrouter':
             unifiedConfig.baseURL = 'https://openrouter.ai/api/v1';
             break;
 
-        case 'ollama':
-        case 'lmstudio':
-        case 'vllm':
-            // baseURL already set above
-            break;
+    case 'ollama':
+    case 'lmstudio':
+    case 'vllm':
+        // baseURL already set above
+        break;
+
+    case 'gemini': {
+        logger.debug('Creating Gemini service', { model: config.model, hasApiKey: !!apiKey });
+        try {
+            return new GeminiService(apiKey, config.model, mcpManager, contextManager, config.maxIterations, unifiedToolManager);
+        } catch (error) {
+            logger.error('Failed to create Gemini service', { error: error instanceof Error ? error.message : String(error), model: config.model });
+            throw error;
+        }
+    }
+
+    case 'deepseek': {
+        const baseURL = getOpenAICompatibleBaseURL(config);
+        const OpenAIClass = require('openai');
+        const openai = new OpenAIClass({ apiKey, baseURL });
+        return new DeepseekService(openai, config.model, mcpManager, contextManager, config.maxIterations, unifiedToolManager);
+    }
+
     }
 
 			const OpenAIClass = require('openai');
