@@ -88,38 +88,7 @@ function getOpenAICompatibleBaseURL(llmConfig: LLMConfig): string {
 		return 'https://api.deepseek.com';
 	}
 
-	return '';
-}
-
-function _createLLMService(
-	config: LLMConfig,
-	mcpManager: MCPManager,
-	contextManager: ContextManager,
-	unifiedToolManager?: UnifiedToolManager,
-	eventManager?: EventManager
-): ILLMService {
-	// Extract and validate API key
-	const apiKey = extractApiKey(config);
-	const baseURL = getOpenAICompatibleBaseURL(config);
-	const providerType = mapProviderToUnifiedType(config.provider);
-
-	// Create unified configuration
-	const unifiedConfig: ExtendedLLMConfig = {
-		provider: providerType,
-		model: config.model,
-		apiKey: apiKey !== 'not-required' ? apiKey : undefined,
-		baseURL: baseURL || undefined,
-		maxIterations: config.maxIterations,
-		streaming: false, // Can be made configurable
-	};
-
-	// Add provider-specific configurations
-	switch (providerType) {
-		case 'aws':
-			unifiedConfig.region = config.aws?.region || process.env.AWS_DEFAULT_REGION || 'us-east-1';
-			unifiedConfig.awsConfig = config.aws;
-			unifiedConfig.inferenceProfileArn = config.aws?.inferenceProfileArn;
-			break;
+        
 
 		case 'azure':
 			unifiedConfig.endpoint = config.azure?.endpoint || process.env.AZURE_OPENAI_ENDPOINT;
