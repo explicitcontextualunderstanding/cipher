@@ -131,7 +131,25 @@ function _createLLMService(
 		case 'qwen':
 			unifiedConfig.enableThinking = config.qwenOptions?.enableThinking;
 			unifiedConfig.thinkingBudget = config.qwenOptions?.thinkingBudget;
-			break;
+			{
+				const OpenAIClass = require('openai');
+				const openai = new OpenAIClass({ apiKey, baseURL });
+				const qwenOptions: QwenOptions = {
+					...(config.qwenOptions?.enableThinking !== undefined && { enableThinking: config.qwenOptions.enableThinking }),
+					...(config.qwenOptions?.thinkingBudget !== undefined && { thinkingBudget: config.qwenOptions.thinkingBudget }),
+					...(config.qwenOptions?.temperature !== undefined && { temperature: config.qwenOptions.temperature }),
+					...(config.qwenOptions?.top_p !== undefined && { top_p: config.qwenOptions.top_p }),
+				};
+				return new QwenService(
+					openai,
+					config.model,
+					mcpManager,
+					contextManager,
+					config.maxIterations,
+					qwenOptions,
+					unifiedToolManager
+				);
+			}
 
 		case 'openrouter':
 			unifiedConfig.baseURL = 'https://openrouter.ai/api/v1';
